@@ -1,0 +1,14 @@
+<section>
+  <h1>Enroll to access — <%= study.title %></h1>
+  <% if (error) { %><p class="error"><%= error %></p><% } %>
+  <p>This study is invite-only. Enter the join code you received from the researcher.</p>
+
+  <form method="post" action="/s/<%= study.slug %>/enroll" style="display:flex; gap:.5rem; align-items:center;">
+    <label style="flex:1">Join code
+      <input name="code" placeholder="8-character code" required>
+    </label>
+    <button type="submit">Enroll</button>
+  </form>
+
+  <p style="margin-top:1rem;"><a href="/participant">← Back to your dashboard</a></p>
+</section>

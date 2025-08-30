@@ -1,0 +1,109 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Study Export — <%= study.title %></title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; font-size: 12px; color: #222; }
+    h1,h2 { margin: 0 0 6px 0; }
+    h1 { font-size: 18px; }
+    h2 { font-size: 14px; margin-top: 12px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+    .meta { color: #555; }
+    table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; vertical-align: top; }
+    th { background: #f6f6f6; text-align: left; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .small { font-size: 11px; color: #444; }
+    .right { text-align: right; }
+    .muted { color:#777; }
+    ul { margin: 6px 0; padding-left: 16px; }
+  </style>
+</head>
+<body>
+  <h1><%= study.title %></h1>
+  <p class="meta">
+    Slug: <code><%= study.slug %></code> • Status: <strong><%= study.status %></strong>
+    <% if (study.status === 'invite') { %> • Join code: <code><%= study.joinCode || '—' %></code><% } %>
+  </p>
+  <div class="grid">
+    <div>
+      <h2>Summary</h2>
+      <p><%= study.summary %></p>
+      <h2>Purpose</h2>
+      <p><%= study.purpose %></p>
+    </div>
+    <div>
+      <h2>Contact & Retention</h2>
+      <p>Email: <a href="mailto:<%= study.contactEmail %>"><%= study.contactEmail %></a></p>
+      <p>Default retention: <%= study.retentionDefaultDays ?? '—' %> days</p>
+      <h2>Categories</h2>
+      <table>
+        <thead><tr><th>Name</th><th>Required</th><th>Retention</th><th>Description</th></tr></thead>
+        <tbody>
+        <% study.categories.forEach(c => { %>
+          <tr>
+            <td><strong><%= c.name %></strong></td>
+            <td><%= c.required ? 'Yes' : 'No' %></td>
+            <td><%= c.retentionDays ?? (study.retentionDefaultDays ?? '—') %> days</td>
+            <td class="small"><%= c.description || '' %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>Consent snapshot</h2>
+  <table>
+    <thead><tr><th>Category</th><th>Allowed</th><th>Denied</th><th>Notes</th></tr></thead>
+    <tbody>
+    <% catAgg.forEach(row => { %>
+      <tr>
+        <td><strong><%= row.cat.name %></strong></td>
+        <td><%= row.allowed %></td>
+        <td><%= row.denied %></td>
+        <td class="small"><%= row.required || '' %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+  <p class="muted small">Participants with no explicit choice on a non-required category are counted as “Denied”.</p>
+
+  <h2>Recent uploads (sample)</h2>
+  <table>
+    <thead><tr><th>When</th><th>Participant</th><th>Category</th><th>Name</th><th class="right">Size (MB)</th></tr></thead>
+    <tbody>
+    <% uploads.slice(0, 20).forEach(u => { %>
+      <tr>
+        <td><%= new Date(u.createdAt).toISOString().replace('T',' ').slice(0,16) %></td>
+        <td><%= pseudonym(u.participantId) %></td>
+        <td><%= u.category?.name || u.categoryId %></td>
+        <td class="small"><%= u.originalName %></td>
+        <td class="right"><%= (u.sizeBytes/1024/1024).toFixed(2) %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+  <p class="small muted">Showing up to 20 recent uploads. See the Excel for full details.</p>
+
+  <h2>Retention activity</h2>
+  <table>
+    <thead><tr><th>When</th><th>UploadId</th><th>Category</th><th>Upload Created</th><th>Retention (days)</th></tr></thead>
+    <tbody>
+    <% purges.slice(0, 50).forEach(r => { const d = r.details || {}; %>
+      <tr>
+        <td><%= new Date(r.createdAt).toISOString().replace('T',' ').slice(0,16) %></td>
+        <td><%= d.uploadId || '' %></td>
+        <td><%= d.category || '' %></td>
+        <td><%= d.createdAt ? new Date(d.createdAt).toISOString().replace('T',' ').slice(0,16) : '' %></td>
+        <td class="right"><%= (d.retentionDays ?? '') %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+  <p class="small muted">See Excel “Retention” sheet for the complete log.</p>
+
+  <p class="small muted">Generated on <%= new Date().toISOString().replace('T',' ').slice(0,16) %></p>
+</body>
+</html>

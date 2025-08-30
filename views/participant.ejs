@@ -1,0 +1,47 @@
+<section>
+  <h1>Studies</h1>
+  <p>Signed in as <strong><%= user.email %></strong></p>
+
+  <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
+  <% if (error)  { %><p class="error"><%= error  %></p><% } %>
+
+  <h2>Join a study</h2>
+  <form method="post" action="/join" style="display:flex; gap:.5rem; align-items:center;">
+    <label style="flex:1">Enter join code
+      <input name="code" placeholder="e.g., 8CHRCODE" required>
+    </label>
+    <button type="submit">Join</button>
+  </form>
+
+  <h2 style="margin-top:1rem;">Your enrolled studies</h2>
+  <% if (!enrolledStudies.length) { %>
+    <p class="meta">You’re not enrolled in any invite-only studies yet.</p>
+  <% } else { %>
+    <ul>
+      <% enrolledStudies.forEach(s => { %>
+        <li class="box">
+          <strong><a href="/s/<%= s.slug %>"><%= s.title %></a></strong>
+          <span class="meta"> — invite</span>
+          <div><%= s.summary %></div>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+
+  <h2 style="margin-top:1rem;">Public studies</h2>
+  <% if (!publicStudies.length) { %>
+    <p>No public studies right now.</p>
+  <% } else { %>
+    <ul>
+      <% publicStudies.forEach(s => { %>
+        <li class="box">
+          <strong><a href="/s/<%= s.slug %>"><%= s.title %></a></strong>
+          <span class="meta"> — public</span>
+          <div><%= s.summary %></div>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+
+  <form method="post" action="/logout" style="margin-top:1rem;"><button>Log out</button></form>
+</section>

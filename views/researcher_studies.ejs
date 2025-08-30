@@ -1,0 +1,54 @@
+<section>
+  <h1>Your studies</h1>
+  <p>Signed in as <strong><%= user.email %></strong></p>
+
+  <p><a href="/researcher/studies/new">+ Create a new study</a></p>
+
+  <% if (!studies.length) { %>
+    <p>No studies yet.</p>
+  <% } else { %>
+    <table>
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Slug</th>
+          <th>Status</th>
+          <th>Join code</th>
+          <th>Categories</th>
+          <th>Retention</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% studies.forEach(s => { %>
+          <tr>
+            <td><strong><%= s.title %></strong></td>
+            <td><code><%= s.slug %></code></td>
+            <td><%= s.status %></td>
+            <td><%= s.status === 'invite' ? (s.joinCode || '—') : '—' %></td>
+            <td>
+              <ul>
+                <% s.categories.forEach(c => { %>
+                  <li><%= c.name %> <%= c.required ? "(required)" : "" %>
+                    <span class="meta"> — ret: <%= c.retentionDays ?? (s.retentionDefaultDays ?? "—") %>d</span>
+                  </li>
+                <% }) %>
+              </ul>
+            </td>
+            <td><%= s.retentionDefaultDays ?? "—" %></td>
+            <td><%= new Date(s.createdAt).toLocaleString() %></td>
+            <td style="min-width:240px">
+              <a class="button" href="/researcher/studies/<%= s.slug %>/participants">Participants</a>
+              <a class="button" href="/researcher/studies/<%= s.slug %>/edit">Edit</a>
+              <a class="button" href="/s/<%= s.slug %>">View</a>
+              <a class="button" href="/researcher/studies/<%= s.slug %>/export.xlsx"><strong>Export Excel</strong></a>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+
+  <form method="post" action="/logout"><button>Log out</button></form>
+</section>

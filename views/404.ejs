@@ -1,0 +1,7 @@
+<section>
+  <h1>Not found</h1>
+  <p>The page you’re looking for doesn’t exist.</p>
+  <p><a href="<%= (user && user.role === 'researcher') ? '/researcher' : '/participant' %>">
+    ← Back to <%= (user && user.role === 'researcher') ? 'your studies' : 'all studies' %>
+  </a></p>
+</section>

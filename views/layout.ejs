@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <% const pageTitle = (typeof title !== 'undefined' && title) ? title : 'Consent Manager'; %>
+  <title><%= pageTitle %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Tailwind via CDN: no build, utilities available immediately -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { primary: '#2563eb', danger: '#b91c1c' }
+          },
+          boxShadow: {
+            card: '0 1px 2px rgb(0 0 0 / 0.06), 0 1px 1px rgb(0 0 0 / 0.04)'
+          },
+          borderRadius: { xl: '0.75rem', '2xl': '1rem' },
+          fontFamily: {
+            sans: ['Inter','system-ui','Segoe UI','Roboto','Arial','sans-serif'],
+            mono: ['ui-monospace','SFMono-Regular','Menlo','Consolas','monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Inline component styles (plain CSS) so our custom classes work without @apply -->
+  <style>
+    :root { --fg:#1f2937; --muted:#6b7280; --line:#e5e7eb; --primary:#2563eb; --danger:#b91c1c; }
+    body { color: var(--fg); }
+    .container-page { margin-left:auto; margin-right:auto; max-width: 64rem; padding-left:1rem; padding-right:1rem; }
+    .section { margin-bottom: 2rem; }
+    .muted { color: var(--muted); }
+    .card { background:#fff; border:1px solid var(--line); border-radius: 1rem; padding: 1.25rem; box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 1px 1px rgb(0 0 0 / 0.04); }
+    .btn { display:inline-flex; align-items:center; gap:.25rem; border:1px solid #cbd5e1; background:#fff; color:#0f172a; padding:.375rem .75rem; border-radius:.75rem; font-size:.875rem; font-weight:500; box-shadow:0 1px 1px rgb(0 0 0 / 0.04); }
+    .btn:hover { background:#f8fafc; }
+    .btn-primary { border-color: var(--primary); background: var(--primary); color: #fff; }
+    .btn-primary:hover { background:#1d4ed8; }
+    .btn-danger { border-color: var(--danger); background: var(--danger); color: #fff; }
+    .btn-danger:hover { background:#991b1b; }
+    .btn-ghost { border-color: transparent; background: transparent; }
+    .btn-ghost:hover { background:#f1f5f9; }
+    .input { display:block; width:100%; border:1px solid #cbd5e1; background:#fff; color:#0f172a; padding:.5rem .75rem; border-radius:.5rem; font-size:.875rem; }
+    .input:focus { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .label { display:block; font-size:.875rem; font-weight:600; color:#334155; margin-bottom:.25rem; }
+    .help { font-size:.875rem; color: var(--muted); }
+    .link { color:#0a58ca; text-decoration: underline; text-underline-offset: 2px; }
+    .table { width:100%; border-collapse: collapse; font-size:.9rem; }
+    .table th, .table td { border:1px solid var(--line); padding:.5rem .75rem; vertical-align: top; text-align:left; }
+    .table thead th { background:#f8fafc; position: sticky; top: 0; }
+    .chip { display:inline-flex; align-items:center; padding:.125rem .5rem; background:#f1f5f9; border-radius:999px; font-size:.75rem; color:#334155; }
+    .chip-required { background:#fef3c7; color:#92400e; }
+    .badge { display:inline-flex; align-items:center; padding:.125rem .5rem; border-radius:.375rem; font-size:.75rem; font-weight:600; }
+    .badge-draft { background:#f1f5f9; color:#334155; }
+    .badge-public { background:#dcfce7; color:#166534; }
+    .badge-invite { background:#fef3c7; color:#92400e; }
+    .notice { border:1px solid #bfdbfe; background:#eaf2ff; color:#1e3a8a; padding:.5rem .75rem; border-radius:.5rem; }
+    .error { border:1px solid #fecaca; background:#ffe4e6; color:#7f1d1d; padding:.5rem .75rem; border-radius:.5rem; }
+  </style>
+</head>
+<body class="min-h-full bg-slate-100 font-sans">
+  <header class="bg-white border-b border-slate-200">
+    <div class="container-page flex items-center justify-between py-3">
+      <a href="/" class="text-lg font-semibold">Consent Manager</a>
+      <div class="flex items-center gap-3">
+        <% if (typeof user !== 'undefined' && user) { %>
+          <% if (user.role === 'researcher') { %>
+            <a class="btn btn-ghost" href="/researcher">Researcher</a>
+          <% } else { %>
+            <a class="btn btn-ghost" href="/participant">Participant</a>
+          <% } %>
+          <form method="post" action="/logout" class="inline"><button class="btn">Log out</button></form>
+        <% } else { %>
+          <a class="btn btn-primary" href="/login">Log in</a>
+        <% } %>
+      </div>
+    </div>
+  </header>
+
+  <main class="container-page py-6">
+    <div class="mb-4 text-slate-500"><%= pageTitle %></div>
+    <%- body %>
+  </main>
+</body>
+</html>

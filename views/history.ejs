@@ -1,0 +1,57 @@
+<section>
+  <h1>Consent history — <%= study.title %></h1>
+  <p>Showing all saved versions for this study. You can download any version as a PDF receipt.</p>
+
+  <% if (!consents.length) { %>
+    <p>No history yet. Save your choices first.</p>
+  <% } else { %>
+    <table>
+      <thead>
+        <tr>
+          <th>Version</th>
+          <th>Effective</th>
+          <th>Withdrawn</th>
+          <th>Granted?</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      <% consents.forEach(c => { %>
+        <tr>
+          <td>v<%= c.version %></td>
+          <td><%= c.createdAt ? new Date(c.createdAt).toLocaleString() : '—' %></td>
+          <td><%= c.withdrawnAt ? new Date(c.withdrawnAt).toLocaleString() : '—' %></td>
+          <td><%= c.granted ? 'Yes' : 'No' %></td>
+          <td>
+            <a class="button" href="/s/<%= study.slug %>/receipt/<%= c.version %>.pdf">Download PDF</a>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+
+    <% if (consents.length >= 2) { %>
+      <h2 style="margin-top:1rem;">Compare two versions</h2>
+      <form method="get" action="/s/<%= study.slug %>/history/diff" style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+        <label>From
+          <select name="v1" required>
+            <% consents.forEach(c => { %>
+              <option value="<%= c.version %>">v<%= c.version %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label>To
+          <select name="v2" required>
+            <% consents.forEach(c => { %>
+              <option value="<%= c.version %>">v<%= c.version %></option>
+            <% }) %>
+          </select>
+        </label>
+        <button type="submit">Show diff</button>
+      </form>
+      <p class="help">Diff shows how category permissions changed between two saved versions.</p>
+    <% } %>
+  <% } %>
+
+  <p style="margin-top:1rem;"><a href="/s/<%= study.slug %>">← Back to study</a></p>
+</section>

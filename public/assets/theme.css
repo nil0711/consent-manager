@@ -1,0 +1,101 @@
+/* ===== Consent Manager Theme (no build step required) ===== */
+:root{
+  --fg:#0F172A;         /* slate-900 */
+  --muted:#475569;      /* slate-600 */
+  --line:#E2E8F0;       /* slate-200 */
+  --page:#F8FAFC;       /* slate-50 */
+  --surface:#FFFFFF;
+  --primary:#2563EB;    /* blue-600 */
+  --primary-hover:#1D4ED8;
+  --ring:#93C5FD;       /* blue-300 */
+  --danger:#B91C1C;     /* red-700 */
+  --danger-hover:#991B1B;
+}
+
+html,body{height:100%;}
+body{
+  margin:0;
+  background:var(--page);
+  color:var(--fg);
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  line-height:1.45;
+  font-size:16px;
+}
+
+/* Layout */
+.container-page{max-width:1040px;margin:0 auto;padding:0 16px;}
+.section{margin-bottom:32px;}
+.muted{color:var(--muted);}
+
+/* Header */
+.app-header{background:var(--surface);border-bottom:1px solid var(--line);}
+.app-brand{font-weight:700;}
+
+/* Cards */
+.card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:20px;
+  box-shadow:0 1px 2px rgb(0 0 0 / 0.06), 0 1px 1px rgb(0 0 0 / 0.04);
+}
+
+/* Buttons */
+.btn{
+  display:inline-flex;align-items:center;gap:.25rem;
+  border:1px solid #cbd5e1;background:#fff;color:#0f172a;
+  padding:.45rem .8rem;border-radius:10px;font-size:.9rem;font-weight:600;
+  box-shadow:0 1px 1px rgb(0 0 0 / 0.04);
+  transition:background .12s ease,border-color .12s ease,box-shadow .12s ease;
+}
+.btn:hover{background:#f8fafc}
+.btn:focus{outline:2px solid var(--ring);outline-offset:2px;}
+.btn[disabled]{opacity:.6;cursor:not-allowed}
+
+.btn-primary{border-color:var(--primary);background:var(--primary);color:#fff;}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-danger{border-color:var(--danger);background:var(--danger);color:#fff;}
+.btn-danger:hover{background:var(--danger-hover)}
+.btn-ghost{border-color:transparent;background:transparent;}
+.btn-ghost:hover{background:#f1f5f9}
+
+/* Inputs */
+.label{display:block;font-size:.9rem;font-weight:600;color:#334155;margin-bottom:.35rem}
+.input{
+  display:block;width:100%;border:1px solid #cbd5e1;background:#fff;color:#0f172a;
+  padding:.55rem .75rem;border-radius:10px;font-size:.95rem;
+}
+.input:focus{outline:2px solid var(--ring);outline-offset:2px;border-color:var(--primary)}
+.help{font-size:.85rem;color:var(--muted);margin-top:.25rem}
+
+/* Links */
+.link{color:#0a58ca;text-decoration:underline;text-underline-offset:2px}
+
+/* Badges & chips */
+.badge{display:inline-flex;align-items:center;border-radius:6px;padding:.15rem .45rem;font-size:.75rem;font-weight:700}
+.badge-draft{background:#eef2ff;color:#3730a3}
+.badge-public{background:#dcfce7;color:#166534}
+.badge-invite{background:#fef3c7;color:#92400e}
+.chip{display:inline-flex;align-items:center;border-radius:999px;background:#f1f5f9;color:#334155;font-size:.75rem;padding:.15rem .5rem}
+.chip-required{background:#fde68a;color:#92400e}
+
+/* Tables */
+.table{width:100%;border-collapse:collapse;font-size:.95rem}
+.table th,.table td{border:1px solid var(--line);padding:.55rem .7rem;vertical-align:top;text-align:left}
+.table thead th{background:#f8fafc;position:sticky;top:0;z-index:1}
+.table tbody tr:nth-child(even){background:#f1f5f9}
+
+/* Banners */
+.notice{border:1px solid #bfdbfe;background:#eaf2ff;color:#1e3a8a;padding:.6rem .8rem;border-radius:10px}
+.error{border:1px solid #fecaca;background:#ffe4e6;color:#7f1d1d;padding:.6rem .8rem;border-radius:10px}
+
+/* Utilities */
+.kbd{border:1px solid #cbd5e1;background:#f8fafc;padding:.1rem .35rem;border-radius:6px;font:600 12px ui-monospace, SFMono-Regular, Menlo, monospace}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+
+/* Print (PDF pages can include these) */
+@media print{
+  body{background:#fff}
+  .card{box-shadow:none;border-color:#ddd}
+  .btn{display:none}
+}

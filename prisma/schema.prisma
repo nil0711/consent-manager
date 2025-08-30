@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  participant
+  researcher
+}
+
+enum StudyStatus {
+  draft
+  public
+  invite
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+
+  studies     Study[]
+  consents    Consent[]
+  uploads     Upload[]
+  enrollments Enrollment[]
+}
+
+model Study {
+  id                   String      @id @default(cuid())
+  ownerId              String
+  owner                User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  slug                 String      @unique
+  title                String
+  summary              String
+  purpose              String
+  contactEmail         String
+  retentionDefaultDays Int?
+  version              Int         @default(1)
+  status               StudyStatus @default(public)
+  joinCode             String?
+  createdAt            DateTime    @default(now())
+
+  categories  DataCategory[]
+  consents    Consent[]
+  audit       AuditLog[]
+  uploads     Upload[]
+  enrollments Enrollment[]
+}
+
+model DataCategory {
+  id            String   @id @default(cuid())
+  studyId       String
+  study         Study    @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  name          String
+  description   String
+  required      Boolean  @default(false)
+  retentionDays Int?
+  createdAt     DateTime @default(now())
+
+  choices ConsentChoice[]
+  uploads Upload[]
+
+  @@index([studyId])
+}
+
+model Consent {
+  id            String    @id @default(cuid())
+  studyId       String
+  study         Study     @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  participantId String
+  participant   User      @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  version       Int
+  granted       Boolean
+  effectiveAt   DateTime  @default(now())
+  withdrawnAt   DateTime?
+  receiptHash   String
+  receiptJson   Json
+
+  choices ConsentChoice[]
+
+  @@index([studyId, participantId, version])
+}
+
+model ConsentChoice {
+  id         String       @id @default(cuid())
+  consentId  String
+  consent    Consent      @relation(fields: [consentId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   DataCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  allowed    Boolean
+
+  @@index([consentId])
+  @@index([categoryId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  studyId   String
+  study     Study    @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  actorRole String
+  actorId   String?
+  action    String
+  details   Json
+  prevHash  String?
+  entryHash String
+  createdAt DateTime @default(now())
+
+  @@index([studyId, createdAt])
+}
+
+model Upload {
+  id            String       @id @default(cuid())
+  studyId       String
+  study         Study        @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  participantId String
+  participant   User         @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  categoryId    String
+  category      DataCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  originalName String
+  filename     String
+  mime         String
+  sizeBytes    Int
+  checksum     String
+  storagePath  String
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  @@index([studyId, participantId, categoryId, createdAt])
+}
+
+model Enrollment {
+  id            String   @id @default(cuid())
+  studyId       String
+  participantId String
+  createdAt     DateTime @default(now())
+
+  study       Study @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  participant User  @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([studyId, participantId])
+  @@index([participantId])
+}

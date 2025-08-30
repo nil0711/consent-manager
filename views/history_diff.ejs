@@ -1,0 +1,37 @@
+<section>
+  <h1>Consent diff: v<%= v1 %> → v<%= v2 %> — <%= study.title %></h1>
+  <p>
+    <a href="/s/<%= study.slug %>/history">← Back to history</a>
+    &nbsp;|&nbsp;
+    <a href="/s/<%= study.slug %>">Study</a>
+  </p>
+
+  <p class="meta">
+    v<%= v1 %> at <%= new Date(c1.effectiveAt).toLocaleString() %>
+    <% if (c1.withdrawnAt) { %> — withdrawn <%= new Date(c1.withdrawnAt).toLocaleString() %><% } %>
+    &nbsp; | &nbsp;
+    v<%= v2 %> at <%= new Date(c2.effectiveAt).toLocaleString() %>
+    <% if (c2.withdrawnAt) { %> — withdrawn <%= new Date(c2.withdrawnAt).toLocaleString() %><% } %>
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th>v<%= v1 %></th>
+        <th>v<%= v2 %></th>
+        <th>Change</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.forEach(r => { %>
+        <tr>
+          <td><strong><%= r.name %></strong></td>
+          <td><%= r.a %></td>
+          <td><%= r.b %></td>
+          <td><%= r.changed ? "Changed" : "—" %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>

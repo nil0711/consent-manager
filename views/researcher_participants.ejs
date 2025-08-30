@@ -1,0 +1,49 @@
+<section>
+  <h1>Participants — <%= study.title %></h1>
+  <p class="meta">Slug: <code><%= study.slug %></code></p>
+
+  <div style="margin:8px 0; display:flex; gap:.5rem; flex-wrap:wrap;">
+    <!-- Keep the old URL but clearly label it as Excel -->
+    <a class="button" href="/researcher/studies/<%= study.slug %>/participants.csv"><strong>Download Excel</strong></a>
+    <a class="button" href="/researcher">← Back to your studies</a>
+  </div>
+
+  <% if (!participants.length) { %>
+    <p>No participants yet.</p>
+  <% } else { %>
+    <table>
+      <thead>
+        <tr>
+          <th>Participant</th>
+          <th>Version</th>
+          <th>Granted</th>
+          <th>Created</th>
+          <th>Withdrawn</th>
+          <% categories.forEach(c => { %>
+            <th><%= c.name %></th>
+          <% }) %>
+          <th>Uploads</th>
+          <th>Last activity</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% participants.forEach(p => { %>
+          <tr>
+            <td><strong><%= p.pseudo %></strong></td>
+            <td><%= p.version %></td>
+            <td><%= p.granted ? 'Yes' : 'No' %></td>
+            <td><%= new Date(p.createdAt).toLocaleString() %></td>
+            <td><%= p.withdrawnAt ? new Date(p.withdrawnAt).toLocaleString() : '—' %></td>
+            <% p.columns.forEach(col => { %>
+              <td><%= col %></td>
+            <% }) %>
+            <td><%= p.uploadCount %></td>
+            <td><%= p.uploadCount ? new Date(p.lastActivity).toLocaleString() : '—' %></td>
+            <td><a href="/researcher/studies/<%= study.slug %>/participants/<%= p.participantId %>">View</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+</section>

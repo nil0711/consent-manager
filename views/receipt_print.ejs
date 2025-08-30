@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Receipt v<%= consent.version %> — <%= study.title %></title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; font-size: 12px; color: #222; }
+    h1,h2 { margin: 0 0 6px 0; }
+    h1 { font-size: 18px; }
+    h2 { font-size: 14px; margin-top: 12px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+    .meta { color: #555; }
+    table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; vertical-align: top; }
+    th { background: #f6f6f6; text-align: left; }
+    .small { font-size: 11px; color: #444; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1>Consent Receipt — <%= study.title %></h1>
+  <p class="meta">
+    Version: <strong><%= consent.version %></strong>
+    • Effective:
+      <% if (consent && consent.createdAt) { %>
+        <%= new Date(consent.createdAt).toISOString().replace('T',' ').slice(0,16) %>
+      <% } else { %>—<% } %>
+    <% if (consent && consent.withdrawnAt) { %>
+      • Withdrawn: <%= new Date(consent.withdrawnAt).toISOString().replace('T',' ').slice(0,16) %>
+    <% } %>
+  </p>
+
+  <h2>Study</h2>
+  <p><strong>Slug:</strong> <code><%= study.slug %></code><br>
+     <strong>Contact:</strong> <a href="mailto:<%= study.contactEmail %>"><%= study.contactEmail %></a><br>
+     <strong>Default retention:</strong> <%= study.retentionDefaultDays ?? '—' %> days</p>
+
+  <h2>Decisions</h2>
+  <table>
+    <thead><tr><th>Category</th><th>Allowed?</th></tr></thead>
+    <tbody>
+      <% (consent?.choices || []).forEach(ch => {
+           const cat = study.categories.find(c => c.id === ch.categoryId);
+      %>
+        <tr>
+          <td><strong><%= cat?.name || ch.categoryId %></strong></td>
+          <td><%= ch.allowed ? 'Allowed' : 'Denied' %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <h2>Receipt integrity</h2>
+  <p class="small">Hash: <code><%= consent?.receiptHash || '—' %></code></p>
+  <p class="small">Generated: <%= (typeof nowIso === 'string' ? nowIso : new Date().toISOString()).replace('T',' ').slice(0,16) %></p>
+</body>
+</html>

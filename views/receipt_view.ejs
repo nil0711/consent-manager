@@ -1,0 +1,10 @@
+<section>
+  <h1>Receipt v<%= version %> — <%= study.title %></h1>
+  <p>
+    <a href="/s/<%= study.slug %>/history">← Back to history</a>
+    &nbsp;|&nbsp;
+    <a href="/s/<%= study.slug %>/receipt/<%= version %>">Download JSON</a>
+  </p>
+
+  <pre style="white-space: pre-wrap; background:#0b1020; color:#e5e7eb; padding:1rem; border-radius:10px; overflow:auto;"><%= pretty %></pre>
+</section>

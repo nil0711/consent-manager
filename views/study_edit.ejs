@@ -1,0 +1,61 @@
+<section>
+  <h1>Edit: <%= study.title %></h1>
+  <% if (error) { %><p class="error"><%= error %></p><% } %>
+
+  <form method="post" action="/researcher/studies/<%= study.slug %>/edit">
+    <label>Title <input name="title" value="<%= study.title %>" required></label>
+    <label>Summary <textarea name="summary" required><%= study.summary %></textarea></label>
+    <label>Purpose <textarea name="purpose" required><%= study.purpose %></textarea></label>
+    <label>Contact email <input name="contactEmail" type="email" value="<%= study.contactEmail %>" required></label>
+
+    <label>Default retention days (optional)
+      <input name="retentionDays" type="number" min="0" value="<%= study.retentionDefaultDays ?? '' %>">
+    </label>
+    <p class="help">Uploads without a category override will be purged after this many days.</p>
+
+    <fieldset>
+      <legend>Status</legend>
+      <select name="status">
+        <option value="public" <%= study.status === 'public' ? 'selected' : '' %>>public</option>
+        <option value="invite" <%= study.status === 'invite' ? 'selected' : '' %>>invite</option>
+        <option value="draft"  <%= study.status === 'draft'  ? 'selected' : '' %>>draft</option>
+      </select>
+    </fieldset>
+
+    <label>Join code (invite mode)
+      <input name="joinCode" value="<%= study.joinCode || '' %>" placeholder="leave blank to keep current / auto-generate">
+    </label>
+
+    <fieldset>
+      <legend>Categories</legend>
+      <% const c = cats; %>
+
+      <input type="hidden" name="c1_id" value="<%= c[0].id %>">
+      <label>1. Name <input name="c1_name" value="<%= c[0].name %>" required></label>
+      <label>1. Description <input name="c1_desc" value="<%= c[0].description %>"></label>
+      <label><input type="checkbox" name="c1_req" <%= c[0].required ? 'checked' : '' %> > Required</label>
+      <label>1. Retention days (optional)
+        <input name="c1_ret" type="number" min="0" value="<%= c[0].retentionDays ?? '' %>">
+      </label>
+
+      <input type="hidden" name="c2_id" value="<%= c[1].id %>">
+      <label>2. Name <input name="c2_name" value="<%= c[1].name %>" required></label>
+      <label>2. Description <input name="c2_desc" value="<%= c[1].description %>"></label>
+      <label><input type="checkbox" name="c2_req" <%= c[1].required ? 'checked' : '' %> > Required</label>
+      <label>2. Retention days (optional)
+        <input name="c2_ret" type="number" min="0" value="<%= c[1].retentionDays ?? '' %>">
+      </label>
+
+      <input type="hidden" name="c3_id" value="<%= c[2].id %>">
+      <label>3. Name <input name="c3_name" value="<%= c[2].name %>" required></label>
+      <label>3. Description <input name="c3_desc" value="<%= c[2].description %>"></label>
+      <label><input type="checkbox" name="c3_req" <%= c[2].required ? 'checked' : '' %> > Required</label>
+      <label>3. Retention days (optional)
+        <input name="c3_ret" type="number" min="0" value="<%= c[2].retentionDays ?? '' %>">
+      </label>
+    </fieldset>
+
+    <button type="submit">Save changes</button>
+    <a href="/researcher">Cancel</a>
+  </form>
+</section>

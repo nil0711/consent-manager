@@ -1,0 +1,15 @@
+<section>
+  <h1>Sign up</h1>
+  <% if (error) { %><p class="error"><%= error %></p><% } %>
+  <form method="post" action="/signup">
+    <label>Email <input name="email" type="email" required></label>
+    <label>Password <input name="password" type="password" required minlength="6"></label>
+    <fieldset>
+      <legend>Role</legend>
+      <label><input type="radio" name="role" value="participant" required> Participant</label>
+      <label><input type="radio" name="role" value="researcher"> Researcher</label>
+    </fieldset>
+    <button type="submit">Create account</button>
+  </form>
+  <p>Have an account? <a href="/login">Log in</a></p>
+</section>

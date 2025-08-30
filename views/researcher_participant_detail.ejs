@@ -1,0 +1,51 @@
+<section>
+  <h1>Participant <code><%= pseudo %></code> — <%= study.title %></h1>
+  <p>
+    <a href="/researcher/studies/<%= study.slug %>/participants">← Back to participants</a>
+  </p>
+
+  <% if (latest) { %>
+    <h2>Latest consent (v<%= latest.version %>)</h2>
+    <p class="meta">
+      Effective: <%= new Date(latest.effectiveAt).toLocaleString() %>
+      <% if (latest.withdrawnAt) { %> — Withdrawn: <%= new Date(latest.withdrawnAt).toLocaleString() %><% } %>
+    </p>
+    <ul>
+      <% latest.choices.forEach(ch => {
+           const cat = categories.find(c => c.id === ch.categoryId);
+      %>
+        <li><strong><%= cat?.name || ch.categoryId %>:</strong> <%= ch.allowed ? "Allowed" : "Denied" %></li>
+      <% }) %>
+    </ul>
+  <% } else { %>
+    <p>No consent saved yet.</p>
+  <% } %>
+
+  <h2 style="margin-top:1rem;">Uploads</h2>
+  <% if (!uploads.length) { %>
+    <p>No uploads from this participant.</p>
+  <% } else { %>
+    <table>
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Category</th>
+          <th>Name</th>
+          <th>Size</th>
+          <th>Download</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% uploads.forEach(u => { %>
+          <tr>
+            <td><%= new Date(u.createdAt).toLocaleString() %></td>
+            <td><%= u.category.name %></td>
+            <td><%= u.originalName %></td>
+            <td><%= (u.sizeBytes/1024/1024).toFixed(2) %> MB</td>
+            <td><a href="/uploads/<%= u.id %>/download">Download</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+</section>
