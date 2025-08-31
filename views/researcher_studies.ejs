@@ -1,54 +1,149 @@
-<section>
-  <h1>Your studies</h1>
-  <p>Signed in as <strong><%= user.email %></strong></p>
+<section class="section">
+  <div class="container-page grid gap-6">
 
-  <p><a href="/researcher/studies/new">+ Create a new study</a></p>
+    <div class="card">
+      <div class="card-header">
+        <h1 class="text-lg font-semibold">Your studies</h1>
+        <div class="flex items-center gap-2">
+          <a class="btn btn-primary" href="/researcher/studies/new">+ Create a new study</a>
+          <!-- Removed the extra "Log out" button; header already has it -->
+        </div>
+      </div>
 
-  <% if (!studies.length) { %>
-    <p>No studies yet.</p>
-  <% } else { %>
-    <table>
-      <thead>
-        <tr>
-          <th>Title</th>
-          <th>Slug</th>
-          <th>Status</th>
-          <th>Join code</th>
-          <th>Categories</th>
-          <th>Retention</th>
-          <th>Created</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% studies.forEach(s => { %>
-          <tr>
-            <td><strong><%= s.title %></strong></td>
-            <td><code><%= s.slug %></code></td>
-            <td><%= s.status %></td>
-            <td><%= s.status === 'invite' ? (s.joinCode || '—') : '—' %></td>
-            <td>
-              <ul>
-                <% s.categories.forEach(c => { %>
-                  <li><%= c.name %> <%= c.required ? "(required)" : "" %>
-                    <span class="meta"> — ret: <%= c.retentionDays ?? (s.retentionDefaultDays ?? "—") %>d</span>
-                  </li>
-                <% }) %>
-              </ul>
-            </td>
-            <td><%= s.retentionDefaultDays ?? "—" %></td>
-            <td><%= new Date(s.createdAt).toLocaleString() %></td>
-            <td style="min-width:240px">
-              <a class="button" href="/researcher/studies/<%= s.slug %>/participants">Participants</a>
-              <a class="button" href="/researcher/studies/<%= s.slug %>/edit">Edit</a>
-              <a class="button" href="/s/<%= s.slug %>">View</a>
-              <a class="button" href="/researcher/studies/<%= s.slug %>/export.xlsx"><strong>Export Excel</strong></a>
-            </td>
+      <!-- My studies search (client-side filter) -->
+      <input id="q-my" class="input w-full" placeholder="Title, purpose, summary, category..." />
+
+      <div class="overflow-x-auto mt-3">
+        <table class="w-full" style="border-collapse:collapse;border:1px solid var(--line);border-radius:12px;overflow:hidden">
+          <thead>
+          <tr style="background:#F1F5F9">
+            <th class="p-2 text-left">Title</th>
+            <th class="p-2 text-left">Slug</th>
+            <th class="p-2 text-left">Status</th>
+            <th class="p-2 text-left">Join code</th>
+            <th class="p-2 text-left">Categories</th>
+            <th class="p-2 text-left">Retention</th>
+            <th class="p-2 text-left">Created</th>
+            <th class="p-2 text-left">Actions</th>
           </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  <% } %>
+          </thead>
+          <tbody id="my-rows">
+          <% studies.forEach(s => {
+               const catList = s.categories.map(c => c.name + (c.required ? " (required)" : "")).join(" , ");
+               const indexText = [
+                 s.title, s.slug, s.status, s.summary, s.purpose, catList
+               ].join(" ").toLowerCase();
+          %>
+            <tr class="border-t" data-search="<%= indexText %>">
+              <td class="p-2"><strong><%= s.title %></strong></td>
+              <td class="p-2"><%= s.slug %></td>
+              <td class="p-2"><%= s.status %></td>
+              <td class="p-2"><%= s.joinCode || "—" %></td>
+              <td class="p-2"><%= catList || "—" %></td>
+              <td class="p-2"><%= (typeof s.retentionDefaultDays === 'number') ? (s.retentionDefaultDays + 'd') : '—' %></td>
+              <td class="p-2"><%= new Date(s.createdAt).toLocaleString() %></td>
+              <td class="p-2">
+                <a class="btn" href="/researcher/studies/<%= s.slug %>/participants">Participants</a>
+                <a class="btn" href="/researcher/studies/<%= s.slug %>/edit">Edit</a>
+                <a class="btn" href="/s/<%= s.slug %>">View</a>
+                <a class="btn" href="/researcher/studies/<%= s.slug %>/export.xlsx">Export Excel</a>
+                <form method="post" action="/researcher/studies/<%= s.slug %>/delete" style="display:inline" onsubmit="return confirm('Delete this study? This removes enrollments, consents, uploads, and logs. This cannot be undone.');">
+                  <button class="btn danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
-  <form method="post" action="/logout"><button>Log out</button></form>
+    <!-- Explore templates (search others to clone) -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="text-lg font-semibold">Explore templates</h2>
+      </div>
+      <p class="card-sub">Search public or invite studies created by others. Clone one to start from a template.</p>
+
+      <div class="muted text-sm mb-1">Search all (excluding yours)</div>
+      <input id="q-tpl" class="input w-full" placeholder="Start typing to search other templates..." />
+      <div id="tpl-results" class="mt-2"></div>
+      <div id="tpl-error" class="error mt-2" style="display:none"></div>
+    </div>
+
+  </div>
+
+  <script>
+    // ------- client-side filter for "My studies" -------
+    (function(){
+      var q = document.getElementById('q-my');
+      var rows = Array.prototype.slice.call(document.querySelectorAll('#my-rows tr'));
+      function apply(){
+        var s = (q.value || '').trim().toLowerCase();
+        rows.forEach(function(r){
+          var hit = !s || (r.getAttribute('data-search') || '').indexOf(s) !== -1;
+          r.style.display = hit ? '' : 'none';
+        });
+      }
+      q.addEventListener('input', apply, { passive: true });
+    })();
+
+    // ------- templates search (server API) -------
+    (function(){
+      var q = document.getElementById('q-tpl');
+      var box = document.getElementById('tpl-results');
+      var err = document.getElementById('tpl-error');
+      var t; // debounce
+
+      function render(items){
+        if (!items.length){
+          box.innerHTML = '<div class="muted">No matches.</div>';
+          return;
+        }
+        box.innerHTML = items.map(function(s){
+          var cats = (s.categories || []).map(function(c){
+            return c.name + (c.required ? ' (required)' : '');
+          }).join(', ');
+          return (
+            '<div class="border border-[var(--line)] rounded-xl p-3 bg-white mb-2">'+
+              '<div class="flex items-start justify-between gap-3">'+
+                '<div class="min-w-0">'+
+                  '<div class="font-medium">'+s.title+'</div>'+
+                  '<div class="muted text-sm">Status: '+s.status+' • Default retention: '+(s.retentionDefaultDays ?? '—')+'d</div>'+
+                  (cats ? '<div class="text-sm">Categories: '+cats+'</div>' : '')+
+                '</div>'+
+                '<form method="post" action="/researcher/templates/'+encodeURIComponent(s.slug)+'/clone">'+
+                  '<button class="btn btn-primary" type="submit">Clone</button>'+
+                '</form>'+
+              '</div>'+
+            '</div>'
+          );
+        }).join('');
+      }
+
+      function search(){
+        var v = (q.value || '').trim();
+        if (!v){ box.innerHTML = ''; err.style.display = 'none'; return; }
+        fetch('/researcher/api/templates?q=' + encodeURIComponent(v), { credentials: 'same-origin' })
+          .then(function(r){
+            if (!r.ok) throw new Error('HTTP '+r.status);
+            return r.json();
+          })
+          .then(function(json){
+            err.style.display = 'none';
+            render(json.rows || []);
+          })
+          .catch(function(){
+            box.innerHTML = '';
+            err.textContent = "Couldn't search templates — please refresh and sign in again.";
+            err.style.display = '';
+          });
+      }
+
+      q.addEventListener('input', function(){
+        clearTimeout(t);
+        t = setTimeout(search, 250);
+      });
+    })();
+  </script>
 </section>

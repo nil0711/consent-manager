@@ -1,37 +1,49 @@
-<section>
-  <h1>Consent diff: v<%= v1 %> → v<%= v2 %> — <%= study.title %></h1>
-  <p>
-    <a href="/s/<%= study.slug %>/history">← Back to history</a>
-    &nbsp;|&nbsp;
-    <a href="/s/<%= study.slug %>">Study</a>
-  </p>
+<section class="section">
+  <div class="container-page grid gap-6">
+    <div class="card">
+      <div class="card-header">
+        <h1 class="text-lg font-semibold">Consent diff — <%= study.title %></h1>
+      </div>
 
-  <p class="meta">
-    v<%= v1 %> at <%= new Date(c1.effectiveAt).toLocaleString() %>
-    <% if (c1.withdrawnAt) { %> — withdrawn <%= new Date(c1.withdrawnAt).toLocaleString() %><% } %>
-    &nbsp; | &nbsp;
-    v<%= v2 %> at <%= new Date(c2.effectiveAt).toLocaleString() %>
-    <% if (c2.withdrawnAt) { %> — withdrawn <%= new Date(c2.withdrawnAt).toLocaleString() %><% } %>
-  </p>
+      <p class="card-sub">
+        Comparing <span class="chip">v<%= v1 %></span> and <span class="chip">v<%= v2 %></span>.
+      </p>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Category</th>
-        <th>v<%= v1 %></th>
-        <th>v<%= v2 %></th>
-        <th>Change</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% rows.forEach(r => { %>
-        <tr>
-          <td><strong><%= r.name %></strong></td>
-          <td><%= r.a %></td>
-          <td><%= r.b %></td>
-          <td><%= r.changed ? "Changed" : "—" %></td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+      <div class="muted mb-2">
+        v<%= v1 %> saved <%= new Date(c1.createdAt).toLocaleString() %>
+        <% if (c1.withdrawnAt) { %> — withdrawn <%= new Date(c1.withdrawnAt).toLocaleString() %><% } %>
+        &nbsp; | &nbsp;
+        v<%= v2 %> saved <%= new Date(c2.createdAt).toLocaleString() %>
+        <% if (c2.withdrawnAt) { %> — withdrawn <%= new Date(c2.withdrawnAt).toLocaleString() %><% } %>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full" style="border-collapse:collapse;border:1px solid var(--line);border-radius:12px;overflow:hidden">
+          <thead>
+            <tr style="background:#F1F5F9">
+              <th class="p-2 text-left">Category</th>
+              <th class="p-2 text-left">v<%= v1 %></th>
+              <th class="p-2 text-left">v<%= v2 %></th>
+              <th class="p-2 text-left">Change</th>
+            </tr>
+          </thead>
+          <tbody>
+          <% rows.forEach(r => { %>
+            <tr style="border-top:1px solid var(--line)">
+              <td class="p-2"><strong><%= r.name %></strong></td>
+              <td class="p-2"><%= r.a %></td>
+              <td class="p-2"><%= r.b %></td>
+              <td class="p-2"><%= r.changed ? 'Changed' : '—' %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="mt-3">
+        <a class="btn" href="/s/<%= study.slug %>/history">← Back to history</a>
+        <a class="btn" href="/s/<%= study.slug %>">Study</a>
+      </p>
+    </div>
+  </div>
 </section>

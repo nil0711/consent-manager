@@ -1,61 +1,168 @@
-<section>
-  <h1>Edit: <%= study.title %></h1>
-  <% if (error) { %><p class="error"><%= error %></p><% } %>
+<section class="section">
+  <div class="container-page grid gap-6">
 
-  <form method="post" action="/researcher/studies/<%= study.slug %>/edit">
-    <label>Title <input name="title" value="<%= study.title %>" required></label>
-    <label>Summary <textarea name="summary" required><%= study.summary %></textarea></label>
-    <label>Purpose <textarea name="purpose" required><%= study.purpose %></textarea></label>
-    <label>Contact email <input name="contactEmail" type="email" value="<%= study.contactEmail %>" required></label>
+    <div class="card">
+      <div class="card-header">
+        <h1 class="text-lg font-semibold">Edit: <%= study.title %></h1>
+        <a class="btn" href="/researcher">Back</a>
+      </div>
 
-    <label>Default retention days (optional)
-      <input name="retentionDays" type="number" min="0" value="<%= study.retentionDefaultDays ?? '' %>">
-    </label>
-    <p class="help">Uploads without a category override will be purged after this many days.</p>
+      <% if (typeof error === 'string' && error) { %>
+        <div class="error mb-3"><%= error %></div>
+      <% } %>
 
-    <fieldset>
-      <legend>Status</legend>
-      <select name="status">
-        <option value="public" <%= study.status === 'public' ? 'selected' : '' %>>public</option>
-        <option value="invite" <%= study.status === 'invite' ? 'selected' : '' %>>invite</option>
-        <option value="draft"  <%= study.status === 'draft'  ? 'selected' : '' %>>draft</option>
-      </select>
-    </fieldset>
+      <% const c = (Array.isArray(cats) ? cats : []).slice(0,3); %>
 
-    <label>Join code (invite mode)
-      <input name="joinCode" value="<%= study.joinCode || '' %>" placeholder="leave blank to keep current / auto-generate">
-    </label>
+      <form method="post" action="/researcher/studies/<%= study.slug %>/edit" class="grid gap-5">
 
-    <fieldset>
-      <legend>Categories</legend>
-      <% const c = cats; %>
+        <!-- Basics -->
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="grid gap-3">
+            <label class="label">Title
+              <input class="input" name="title" required
+                     value="<%= study.title %>">
+            </label>
 
-      <input type="hidden" name="c1_id" value="<%= c[0].id %>">
-      <label>1. Name <input name="c1_name" value="<%= c[0].name %>" required></label>
-      <label>1. Description <input name="c1_desc" value="<%= c[0].description %>"></label>
-      <label><input type="checkbox" name="c1_req" <%= c[0].required ? 'checked' : '' %> > Required</label>
-      <label>1. Retention days (optional)
-        <input name="c1_ret" type="number" min="0" value="<%= c[0].retentionDays ?? '' %>">
-      </label>
+            <label class="label">Purpose
+              <textarea class="input" name="purpose" rows="3" required><%= study.purpose %></textarea>
+            </label>
+          </div>
 
-      <input type="hidden" name="c2_id" value="<%= c[1].id %>">
-      <label>2. Name <input name="c2_name" value="<%= c[1].name %>" required></label>
-      <label>2. Description <input name="c2_desc" value="<%= c[1].description %>"></label>
-      <label><input type="checkbox" name="c2_req" <%= c[1].required ? 'checked' : '' %> > Required</label>
-      <label>2. Retention days (optional)
-        <input name="c2_ret" type="number" min="0" value="<%= c[1].retentionDays ?? '' %>">
-      </label>
+          <div class="grid gap-3">
+            <label class="label">Summary
+              <textarea class="input" name="summary" rows="3" required><%= study.summary %></textarea>
+            </label>
 
-      <input type="hidden" name="c3_id" value="<%= c[2].id %>">
-      <label>3. Name <input name="c3_name" value="<%= c[2].name %>" required></label>
-      <label>3. Description <input name="c3_desc" value="<%= c[2].description %>"></label>
-      <label><input type="checkbox" name="c3_req" <%= c[2].required ? 'checked' : '' %> > Required</label>
-      <label>3. Retention days (optional)
-        <input name="c3_ret" type="number" min="0" value="<%= c[2].retentionDays ?? '' %>">
-      </label>
-    </fieldset>
+            <div class="grid md:grid-cols-2 gap-3">
+              <label class="label">Contact email
+                <input class="input" type="email" name="contactEmail" required
+                       value="<%= study.contactEmail %>">
+              </label>
+              <label class="label">Default retention days (optional)
+                <input class="input" type="number" min="0" name="retentionDays"
+                       value="<%= (typeof study.retentionDefaultDays === 'number' ? study.retentionDefaultDays : '') %>">
+              </label>
+            </div>
+            <p class="help -mt-2">Uploads without a category override will be purged after this many days.</p>
+          </div>
+        </div>
 
-    <button type="submit">Save changes</button>
-    <a href="/researcher">Cancel</a>
-  </form>
+        <!-- Status & join code -->
+        <div class="grid md:grid-cols-[1fr,1fr] gap-4">
+          <label class="label">Status
+            <select class="input" name="status" id="status-select">
+              <option value="public" <%= study.status === 'public' ? 'selected' : '' %>>public</option>
+              <option value="invite" <%= study.status === 'invite' ? 'selected' : '' %>>invite</option>
+              <option value="draft"  <%= study.status === 'draft'  ? 'selected' : '' %>>draft</option>
+            </select>
+          </label>
+
+          <div id="join-wrapper">
+            <label class="label">Join code (invite mode)
+              <input class="input" name="joinCode"
+                     placeholder="leave blank to keep current / auto-generate"
+                     value="<%= (study.joinCode || '') %>">
+            </label>
+          </div>
+        </div>
+
+        <!-- Categories -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="text-lg font-semibold">Categories</h2>
+          </div>
+
+          <div class="grid md:grid-cols-3 gap-4">
+            <!-- Cat 1 -->
+            <div class="border border-[var(--line)] rounded-xl p-3 bg-white grid gap-3">
+              <div class="font-medium">Category 1</div>
+              <input type="hidden" name="c1_id" value="<%= c[0]?.id || '' %>">
+              <label class="label">Name
+                <input class="input" name="c1_name" required value="<%= c[0]?.name || '' %>">
+              </label>
+              <label class="label">Description
+                <input class="input" name="c1_desc" value="<%= c[0]?.description || '' %>">
+              </label>
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="c1_req" name="c1_req" <%= (c[0]?.required ? 'checked' : '') %> >
+                <label for="c1_req">Required</label>
+              </div>
+              <label class="label">Retention days (optional)
+                <input class="input" type="number" min="0" name="c1_ret"
+                       value="<%= (typeof c[0]?.retentionDays === 'number' ? c[0].retentionDays : '') %>">
+              </label>
+            </div>
+
+            <!-- Cat 2 -->
+            <div class="border border-[var(--line)] rounded-xl p-3 bg-white grid gap-3">
+              <div class="font-medium">Category 2</div>
+              <input type="hidden" name="c2_id" value="<%= c[1]?.id || '' %>">
+              <label class="label">Name
+                <input class="input" name="c2_name" required value="<%= c[1]?.name || '' %>">
+              </label>
+              <label class="label">Description
+                <input class="input" name="c2_desc" value="<%= c[1]?.description || '' %>">
+              </label>
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="c2_req" name="c2_req" <%= (c[1]?.required ? 'checked' : '') %> >
+                <label for="c2_req">Required</label>
+              </div>
+              <label class="label">Retention days (optional)
+                <input class="input" type="number" min="0" name="c2_ret"
+                       value="<%= (typeof c[1]?.retentionDays === 'number' ? c[1].retentionDays : '') %>">
+              </label>
+            </div>
+
+            <!-- Cat 3 -->
+            <div class="border border-[var(--line)] rounded-xl p-3 bg-white grid gap-3">
+              <div class="font-medium">Category 3</div>
+              <input type="hidden" name="c3_id" value="<%= c[2]?.id || '' %>">
+              <label class="label">Name
+                <input class="input" name="c3_name" required value="<%= c[2]?.name || '' %>">
+              </label>
+              <label class="label">Description
+                <input class="input" name="c3_desc" value="<%= c[2]?.description || '' %>">
+              </label>
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="c3_req" name="c3_req" <%= (c[2]?.required ? 'checked' : '') %> >
+                <label for="c3_req">Required</label>
+              </div>
+              <label class="label">Retention days (optional)
+                <input class="input" type="number" min="0" name="c3_ret"
+                       value="<%= (typeof c[2]?.retentionDays === 'number' ? c[2].retentionDays : '') %>">
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-primary" type="submit">Save changes</button>
+          <a class="btn" href="/researcher">Cancel</a>
+        </div>
+      </form>
+    </div>
+
+    <!-- Optional Danger zone (only shows if you wired the delete route) -->
+    <div class="card" style="border-color: var(--danger);">
+      <div class="card-header">
+        <h2 class="text-lg font-semibold">Danger zone</h2>
+      </div>
+      <p class="help">Deleting this study removes enrollments and prevents further access.</p>
+      <form method="post" action="/researcher/studies/<%= study.slug %>/delete"
+            onsubmit="return confirm('Delete this study? This action cannot be undone.');">
+        <button class="btn danger">Delete study</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      var sel = document.getElementById('status-select');
+      var wrap = document.getElementById('join-wrapper');
+      function toggleJoin(){ wrap.style.display = sel.value === 'invite' ? '' : 'none'; }
+      toggleJoin();
+      sel.addEventListener('change', toggleJoin, { passive: true });
+    })();
+  </script>
 </section>

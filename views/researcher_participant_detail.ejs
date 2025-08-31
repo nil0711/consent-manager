@@ -1,51 +1,93 @@
-<section>
-  <h1>Participant <code><%= pseudo %></code> — <%= study.title %></h1>
-  <p>
-    <a href="/researcher/studies/<%= study.slug %>/participants">← Back to participants</a>
-  </p>
+<section class="section">
+  <div class="container-page grid gap-6">
 
-  <% if (latest) { %>
-    <h2>Latest consent (v<%= latest.version %>)</h2>
-    <p class="meta">
-      Effective: <%= new Date(latest.effectiveAt).toLocaleString() %>
-      <% if (latest.withdrawnAt) { %> — Withdrawn: <%= new Date(latest.withdrawnAt).toLocaleString() %><% } %>
-    </p>
-    <ul>
-      <% latest.choices.forEach(ch => {
-           const cat = categories.find(c => c.id === ch.categoryId);
-      %>
-        <li><strong><%= cat?.name || ch.categoryId %>:</strong> <%= ch.allowed ? "Allowed" : "Denied" %></li>
-      <% }) %>
-    </ul>
-  <% } else { %>
-    <p>No consent saved yet.</p>
-  <% } %>
+    <div class="card fade-in">
+      <div class="card-header">
+        <div class="min-w-0">
+          <h1 class="text-lg font-semibold">
+            Participant <code><%= pseudo %></code> — <%= study.title %>
+          </h1>
+          <div class="card-sub">
+            <a class="hover:underline" href="/researcher/studies/<%= study.slug %>/participants">← Back to participants</a>
+          </div>
+        </div>
+      </div>
 
-  <h2 style="margin-top:1rem;">Uploads</h2>
-  <% if (!uploads.length) { %>
-    <p>No uploads from this participant.</p>
-  <% } else { %>
-    <table>
-      <thead>
-        <tr>
-          <th>When</th>
-          <th>Category</th>
-          <th>Name</th>
-          <th>Size</th>
-          <th>Download</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% uploads.forEach(u => { %>
-          <tr>
-            <td><%= new Date(u.createdAt).toLocaleString() %></td>
-            <td><%= u.category.name %></td>
-            <td><%= u.originalName %></td>
-            <td><%= (u.sizeBytes/1024/1024).toFixed(2) %> MB</td>
-            <td><a href="/uploads/<%= u.id %>/download">Download</a></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  <% } %>
+      <!-- Latest consent -->
+      <div class="mt-2">
+        <% if (latest) { %>
+          <div class="flex items-center gap-2 mb-1">
+            <h2 class="text-base font-semibold">Latest consent</h2>
+            <span class="chip">v<%= latest.version %></span>
+          </div>
+          <div class="muted mb-2">
+            Effective: <%= new Date(latest.effectiveAt).toLocaleString() %>
+            <% if (latest.withdrawnAt) { %>
+              — Withdrawn: <%= new Date(latest.withdrawnAt).toLocaleString() %>
+            <% } %>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full" style="border-collapse:collapse;border:1px solid var(--line);border-radius:12px;overflow:hidden">
+              <thead>
+                <tr style="background:var(--zebra)">
+                  <th class="p-2 text-left">Category</th>
+                  <th class="p-2 text-left">Allowed?</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% latest.choices.forEach(ch => {
+                     const cat = categories.find(c => c.id === ch.categoryId);
+                %>
+                  <tr style="border-top:1px solid var(--line)">
+                    <td class="p-2"><strong><%= cat?.name || ch.categoryId %></strong></td>
+                    <td class="p-2"><%= ch.allowed ? 'Allowed' : 'Denied' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <div class="notice">No consent saved yet.</div>
+        <% } %>
+      </div>
+
+      <!-- Uploads -->
+      <div class="mt-6">
+        <h2 class="text-base font-semibold mb-2">Uploads</h2>
+        <% if (!uploads.length) { %>
+          <div class="muted">No uploads from this participant.</div>
+        <% } else { %>
+          <div class="overflow-x-auto">
+            <table class="w-full" style="border-collapse:collapse;border:1px solid var(--line);border-radius:12px;overflow:hidden">
+              <thead>
+                <tr style="background:var(--zebra)">
+                  <th class="p-2 text-left">When</th>
+                  <th class="p-2 text-left">Category</th>
+                  <th class="p-2 text-left">File name</th>
+                  <th class="p-2 text-left">Size</th>
+                  <th class="p-2 text-left">Download</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% uploads.forEach(u => { %>
+                  <tr style="border-top:1px solid var(--line)">
+                    <td class="p-2"><%= new Date(u.createdAt).toLocaleString() %></td>
+                    <td class="p-2"><%= u.category?.name || '—' %></td>
+                    <td class="p-2"><%= u.originalName %></td>
+                    <td class="p-2"><%= (u.sizeBytes/1024/1024).toFixed(2) %> MB</td>
+                    <td class="p-2">
+                      <a class="btn" href="/uploads/<%= u.id %>/download">Download</a>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+
+    </div>
+
+  </div>
 </section>

@@ -1,116 +1,211 @@
-<section>
-  <h1><%= study.title %></h1>
+<section class="section">
+  <div class="container-page grid gap-6">
 
-  <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
-  <% if (error)  { %><p class="error"><%= error  %></p><% } %>
-
-  <p><strong>Summary:</strong> <%= study.summary %></p>
-  <p><strong>Purpose:</strong> <%= study.purpose %></p>
-  <p><strong>Contact:</strong> <a href="mailto:<%= study.contactEmail %>"><%= study.contactEmail %></a></p>
-  <p><strong>Default retention:</strong> <%= study.retentionDefaultDays ?? "—" %> days</p>
-
-  <h2>Data categories</h2>
-
-  <% if (user.role === 'participant') { %>
-    <!-- Consent controls -->
-    <form method="post" action="/s/<%= study.slug %>/consent">
-      <ul>
-        <% study.categories.forEach(c => {
-             const prior = (latestConsent && latestConsent.choices.find(ch => ch.categoryId === c.id));
-             const allowed = prior ? prior.allowed : false;
-        %>
-          <li class="box">
-            <strong><%= c.name %></strong> <%= c.required ? "(required)" : "" %> — <%= c.description %>
-            <div class="meta">Retention: <%= c.retentionDays ?? (study.retentionDefaultDays ?? "—") %> days</div>
-            <div style="margin-top:.5rem;">
-              <label>
-                <input type="checkbox" name="cat_<%= c.id %>" <%= (c.required || allowed) ? 'checked' : '' %> <%= c.required ? 'disabled' : '' %> >
-                Allow
-              </label>
-            </div>
-          </li>
-        <% }) %>
-      </ul>
-      <div style="display:flex; gap:.5rem; margin-top:.75rem; flex-wrap: wrap;">
-        <button type="submit">Save choices</button>
-        <a href="/s/<%= study.slug %>/receipt/latest" class="button"><strong>Receipt PDF</strong></a>
-        <a href="/s/<%= study.slug %>/history" class="button">Consent history</a>
-        <button formaction="/s/<%= study.slug %>/withdraw" formmethod="post" type="submit" class="danger">Withdraw (deny all)</button>
-      </div>
-      <p class="help">Required categories are always allowed. Saving creates a new version.</p>
-    </form>
-
-    <!-- Upload area -->
-    <h2 style="margin-top:1.25rem;">Uploads</h2>
-    <form method="post" action="/s/<%= study.slug %>/upload" enctype="multipart/form-data">
-      <label>Choose category
-        <select name="categoryId" required>
-          <% study.categories.forEach(c => { %>
-            <option value="<%= c.id %>"><%= c.name %> <%= c.required ? "(required)" : "" %></option>
-          <% }) %>
-        </select>
-      </label>
-      <label>File <input type="file" name="file" required></label>
-      <button type="submit">Upload</button>
-      <p class="help">Uploads are allowed only for categories you’ve allowed (required categories are always allowed). Max 10MB.</p>
-    </form>
-
-    <% if (myUploads && myUploads.length) { %>
-      <table>
-        <thead><tr><th>When</th><th>Category</th><th>Name</th><th>Size</th><th>Actions</th></tr></thead>
-        <tbody>
-        <% myUploads.forEach(u => { %>
-          <tr>
-            <td><%= new Date(u.createdAt).toLocaleString() %></td>
-            <td><%= u.category.name %></td>
-            <td><%= u.originalName %></td>
-            <td><%= (u.sizeBytes/1024/1024).toFixed(2) %> MB</td>
-            <td>
-              <a href="/uploads/<%= u.id %>/download">Download</a>
-              <% if (!u.deletedAt) { %>
-                &nbsp;|&nbsp;
-                <form method="post" action="/uploads/<%= u.id %>/delete" style="display:inline;">
-                  <button class="danger">Delete</button>
-                </form>
-              <% } %>
-            </td>
-          </tr>
-        <% }) %>
-        </tbody>
-      </table>
-    <% } %>
-
-    <% if (latestConsent) { %>
-      <h3>Latest saved choices (v<%= latestConsent.version %>)</h3>
-      <ul>
-        <% latestConsent.choices.forEach(ch => {
-             const cat = study.categories.find(c => c.id === ch.categoryId);
-        %>
-          <li><strong><%= cat?.name || ch.categoryId %>:</strong> <%= ch.allowed ? 'Allowed' : 'Denied' %></li>
-        <% }) %>
-      </ul>
-      <p class="meta">Receipt hash: <code><%= latestConsent.receiptHash %></code></p>
-    <% } %>
-
-  <% } else { %>
-    <!-- Researcher read-only view + Excel export only -->
-    <ul>
-      <% study.categories.forEach(c => { %>
-        <li class="box">
-          <strong><%= c.name %></strong> <%= c.required ? "(required)" : "" %> — <%= c.description %>
-          <div class="meta">Retention: <%= c.retentionDays ?? (study.retentionDefaultDays ?? "—") %> days</div>
-        </li>
-      <% }) %>
-    </ul>
-    <p class="help"><em>Participants see consent and uploads here.</em></p>
-    <div style="margin-top:.75rem; display:flex; gap:.5rem; flex-wrap: wrap;">
-      <a class="button" href="/researcher/studies/<%= study.slug %>/export.xlsx"><strong>Export Excel</strong></a>
+    <!-- sentinels + back links -->
+    <div id="sentinel-top" style="height:1px;"></div>
+    <div id="back-top" class="muted">
+      <a href="<%= (user && user.role === 'researcher') ? '/researcher' : '/participant' %>">
+        ← Back to <%= (user && user.role === 'researcher') ? 'your studies' : 'all studies' %>
+      </a>
     </div>
-  <% } %>
 
-  <p style="margin-top:1rem;">
-    <a href="<%= (user && user.role === 'researcher') ? '/researcher' : '/participant' %>">
-      ← Back to <%= (user && user.role === 'researcher') ? 'your studies' : 'all studies' %>
-    </a>
-  </p>
+    <div class="card fade-in">
+      <div class="card-header">
+        <h1 class="text-xl font-semibold"><%= study.title %></h1>
+        <span class="chip"><%= (study.status || 'public') %></span>
+      </div>
+
+      <% if (notice) { %><div class="notice mb-3"><%= notice %></div><% } %>
+      <% if (error)  { %><div class="error  mb-3"><%= error  %></div><% } %>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <div class="mb-2">
+            <div class="text-sm muted">Purpose</div>
+            <div><%= study.purpose || "—" %></div>
+          </div>
+          <div class="mb-2">
+            <div class="text-sm muted">Summary</div>
+            <div><%= study.summary || "—" %></div>
+          </div>
+        </div>
+        <div>
+          <div class="mb-2">
+            <div class="text-sm muted">Contact</div>
+            <div><a class="hover:underline" href="mailto:<%= study.contactEmail %>"><%= study.contactEmail %></a></div>
+          </div>
+          <div class="mb-2">
+            <div class="text-sm muted">Default retention</div>
+            <div><%= (typeof study.retentionDefaultDays === 'number') ? (study.retentionDefaultDays + ' days') : '—' %></div>
+          </div>
+          <% if (user.role === 'participant') { %>
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <% if (enrolled) { %>
+              <form method="post" action="/s/<%= study.slug %>/unenroll">
+                <button class="btn" type="submit">Unenroll</button>
+              </form>
+              <span class="chip">Enrolled</span>
+            <% } else { %>
+              <form method="post" action="/s/<%= study.slug %>/enroll" class="flex items-end gap-2 flex-wrap">
+                <% if ((study.status || '').toLowerCase() === 'invite' && (study.joinCode || '').trim().length > 0) { %>
+                  <div>
+                    <label class="label" for="join-code">Join code</label>
+                    <input id="join-code" name="code" class="input" placeholder="Enter code">
+                  </div>
+                <% } %>
+                <button class="btn btn-primary" type="submit">Enroll</button>
+              </form>
+            <% } %>
+          </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <% if (user.role === 'participant') { %>
+      <!-- Consent UI -->
+      <div class="card fade-in">
+        <div class="card-header">
+          <h2 class="text-lg font-semibold">Your consent</h2>
+          <% if (latestConsent) { %><span class="chip">v<%= latestConsent.version %></span><% } %>
+        </div>
+        <p class="card-sub mb-2">
+          Choose which categories of your data you allow this study to collect/use. Required categories are always allowed.
+        </p>
+
+        <form method="post" action="/s/<%= study.slug %>/consent">
+          <div class="grid gap-3">
+            <% study.categories.forEach(c => {
+                 const prior = (latestConsent && latestConsent.choices.find(ch => ch.categoryId === c.id));
+                 const allowed = prior ? prior.allowed : !!c.required;
+                 const rdays = (typeof c.retentionDays === 'number')
+                               ? c.retentionDays
+                               : (typeof study.retentionDefaultDays === 'number' ? study.retentionDefaultDays : null);
+            %>
+              <div class="border border-[var(--line)] rounded-xl p-3 bg-white">
+                <div class="flex items-start justify-between gap-4">
+                  <div class="min-w-0">
+                    <div class="font-medium">
+                      <%= c.name %>
+                      <% if (c.required) { %><span class="chip">required</span><% } %>
+                    </div>
+                    <% if (c.description) { %>
+                      <div class="muted"><%= c.description %></div>
+                    <% } %>
+                    <div class="text-sm mt-1">
+                      Retention: <%= (rdays === null) ? '—' : (rdays + ' days') %>
+                    </div>
+                  </div>
+                  <div class="shrink-0 pt-1">
+                    <label class="inline-flex items-center gap-2">
+                      <input type="checkbox"
+                             name="cat_<%= c.id %>"
+                             <%= allowed ? 'checked' : '' %>
+                             <%= c.required ? 'disabled' : '' %> >
+                      <span><%= c.required ? 'Allowed' : 'Allow' %></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button type="submit" class="btn btn-primary">Save choices</button>
+            <a class="btn" href="/s/<%= study.slug %>/receipt/latest"><strong>Receipt PDF</strong></a>
+<a class="btn" href="/s/<%= study.slug %>/history">Consent history</a>
+            <button formaction="/s/<%= study.slug %>/withdraw" formmethod="post" class="btn danger">Withdraw (deny all)</button>
+          </div>
+          <p class="help mt-2">Saving creates a new versioned consent receipt. Withdraw sets all categories to denied.</p>
+        </form>
+
+        <% if (latestConsent) { %>
+          <div class="mt-4">
+            <div class="text-sm muted mb-1">Latest snapshot</div>
+            <ul class="list-disc pl-5">
+              <% latestConsent.choices.forEach(ch => {
+                   const cat = study.categories.find(c => c.id === ch.categoryId);
+              %>
+                <li><strong><%= cat?.name || ch.categoryId %>:</strong> <%= ch.allowed ? 'Allowed' : 'Denied' %></li>
+              <% }) %>
+            </ul>
+            <div class="text-sm mt-1">Receipt hash: <code><%= latestConsent.receiptHash %></code></div>
+          </div>
+        <% } %>
+      </div>
+    <% } else { %>
+      <!-- Researcher read-only summary -->
+      <div class="card fade-in">
+        <div class="card-header">
+          <h2 class="text-lg font-semibold">Categories</h2>
+        </div>
+        <div class="grid gap-3">
+          <% study.categories.forEach(c => { %>
+            <div class="border border-[var(--line)] rounded-xl p-3 bg-white">
+              <div class="font-medium">
+                <%= c.name %> <% if (c.required) { %><span class="chip">required</span><% } %>
+              </div>
+              <% if (c.description) { %><div class="muted"><%= c.description %></div><% } %>
+              <div class="text-sm mt-1">
+                Retention:
+                <%= (typeof c.retentionDays === 'number')
+                      ? (c.retentionDays + ' days')
+                      : (typeof study.retentionDefaultDays === 'number' ? (study.retentionDefaultDays + ' days') : '—') %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+        <div class="mt-3">
+          <a class="btn" href="/researcher/studies/<%= study.slug %>/export.xlsx"><strong>Export Excel</strong></a>
+        </div>
+      </div>
+    <% } %>
+
+    <!-- bottom back link (auto-shown when top is out of view) -->
+    <div id="back-bottom" class="muted" style="display:none">
+      <a href="<%= (user && user.role === 'researcher') ? '/researcher' : '/participant' %>">
+        ← Back to <%= (user && user.role === 'researcher') ? 'your studies' : 'all studies' %>
+      </a>
+    </div>
+    <div id="sentinel-bottom" style="height:1px;"></div>
+  </div>
+
+  <!-- smart toggle for back link: top by default, bottom when scrolled -->
+  <script>
+    (function () {
+      try {
+        var topLink = document.getElementById('back-top');
+        var bottomLink = document.getElementById('back-bottom');
+        var topSentinel = document.getElementById('sentinel-top');
+
+        function show(which){
+          if (topLink) topLink.style.display = (which === 'top') ? '' : 'none';
+          if (bottomLink) bottomLink.style.display = (which === 'bottom') ? '' : 'none';
+        }
+        show('top'); // default
+
+        var topVisible = true;
+        var io = new IntersectionObserver(function(entries){
+          entries.forEach(function(e){
+            if (e.target === topSentinel) topVisible = e.isIntersecting;
+          });
+          show(topVisible ? 'top' : 'bottom');
+        }, { root: null, threshold: 0.01 });
+
+        if (topSentinel) io.observe(topSentinel);
+      } catch (_) {
+        // fallback: basic scroll heuristic
+        window.addEventListener('scroll', function(){
+          var topVisible = window.scrollY <= 10;
+          if (topVisible) {
+            if (backTop) backTop.style.display = '';
+            if (backBottom) backBottom.style.display = 'none';
+          } else {
+            if (backTop) backTop.style.display = 'none';
+            if (backBottom) backBottom.style.display = '';
+          }
+        }, { passive: true });
+      }
+    })();
+  </script>
 </section>

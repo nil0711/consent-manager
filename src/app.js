@@ -1,3 +1,4 @@
+// src/app.js
 import express from "express";
 import session from "express-session";
 import path from "node:path";
@@ -12,6 +13,7 @@ import participantRouter from "./routes/participant.js";
 import researcherRouter from "./routes/researcher.js";
 import studyRouter from "./routes/study.js";
 import { startRetentionJob } from "./jobs/retention.js";
+import { startMetricsJob } from "./jobs/metrics.js";
 
 export function createApp() {
   const app = express();
@@ -19,7 +21,7 @@ export function createApp() {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
 
-  // Trust proxy if behind one (important for secure cookies in prod)
+  // Trust proxy when running behind one (set TRUST_PROXY=1 in .env)
   if (process.env.TRUST_PROXY === "1") {
     app.set("trust proxy", 1);
   }
@@ -54,22 +56,42 @@ export function createApp() {
       cookie: {
         httpOnly: true,
         sameSite: "lax",
-        secure: process.env.COOKIE_SECURE === "1", // set to 1 in prod with HTTPS
+        secure: process.env.COOKIE_SECURE === "1",
         maxAge: 1000 * 60 * 60 * 8 // 8h
       }
     })
   );
 
-  // ---- Rate limiting ----
+  // ---- Rate limiting (robust key generator; no hard validation) ----
   const WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 10 * 60 * 1000); // 10 min
-  const MAX_GLOBAL = Number(process.env.RATE_LIMIT_MAX || 600); // per IP per window
-  const MAX_AUTH = Number(process.env.RATE_LIMIT_AUTH_MAX || 20); // tighter for auth POSTs
+  const MAX_GLOBAL = Number(process.env.RATE_LIMIT_MAX || 600);
+  const MAX_AUTH = Number(process.env.RATE_LIMIT_AUTH_MAX || 20);
+
+  const keyGen = (req) => {
+    // Prefer Express' req.ip, then common proxy headers, then socket addresses
+    const xff = req.headers?.["x-forwarded-for"];
+    const firstXff =
+      Array.isArray(xff) ? xff[0] :
+      typeof xff === "string" ? xff.split(",")[0].trim() :
+      null;
+
+    return (
+      req.ip ||
+      req.headers?.["x-real-ip"] ||
+      firstXff ||
+      req.connection?.remoteAddress ||
+      req.socket?.remoteAddress ||
+      "local"
+    );
+  };
 
   const globalLimiter = rateLimit({
     windowMs: WINDOW_MS,
     max: MAX_GLOBAL,
     standardHeaders: "draft-7",
-    legacyHeaders: false
+    legacyHeaders: false,
+    keyGenerator: keyGen,
+    validate: false, // ← avoid throwing on missing/undefined IPs
   });
 
   const authPostLimiter = rateLimit({
@@ -77,6 +99,8 @@ export function createApp() {
     max: MAX_AUTH,
     standardHeaders: "draft-7",
     legacyHeaders: false,
+    keyGenerator: keyGen,
+    validate: false,
     message: "Too many attempts. Try again later."
   });
 
@@ -84,7 +108,8 @@ export function createApp() {
   app.use(globalLimiter);
 
   // Apply strict limiter only to POST /login and POST /signup (not GET forms)
-  const postOnly = (limiter) => (req, res, next) => (req.method === "POST" ? limiter(req, res, next) : next());
+  const postOnly = (limiter) => (req, res, next) =>
+    req.method === "POST" ? limiter(req, res, next) : next();
   app.use("/login", postOnly(authPostLimiter));
   app.use("/signup", postOnly(authPostLimiter));
 
@@ -96,7 +121,9 @@ export function createApp() {
 
   // 404
   app.use((req, res) => {
-    res.status(404).render("404", { title: "Not found", user: req.session?.user || null });
+    res
+      .status(404)
+      .render("404", { title: "Not found", user: req.session?.user || null });
   });
 
   // Error handler
@@ -104,7 +131,9 @@ export function createApp() {
     console.error("[500]", err);
     const msg =
       (err && err.expose && err.message) ||
-      (process.env.NODE_ENV === "development" ? String(err?.stack || err) : "Unexpected error");
+      (process.env.NODE_ENV === "development"
+        ? String(err?.stack || err)
+        : "Unexpected error");
     res.status(err.statusCode || 500).render("500", {
       title: "Error",
       user: req.session?.user || null,
@@ -112,8 +141,9 @@ export function createApp() {
     });
   });
 
-  // 🔔 Start scheduled retention sweeper
+  // Background jobs
   startRetentionJob();
+  startMetricsJob();
 
   return app;
 }

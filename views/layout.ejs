@@ -6,84 +6,113 @@
   <title><%= pageTitle %></title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Tailwind via CDN: no build, utilities available immediately -->
+  <!-- Tailwind utilities via CDN for simple layout help -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            brand: { primary: '#2563eb', danger: '#b91c1c' }
-          },
-          boxShadow: {
-            card: '0 1px 2px rgb(0 0 0 / 0.06), 0 1px 1px rgb(0 0 0 / 0.04)'
-          },
-          borderRadius: { xl: '0.75rem', '2xl': '1rem' },
-          fontFamily: {
-            sans: ['Inter','system-ui','Segoe UI','Roboto','Arial','sans-serif'],
-            mono: ['ui-monospace','SFMono-Regular','Menlo','Consolas','monospace']
-          }
-        }
-      }
-    }
-  </script>
 
-  <!-- Inline component styles (plain CSS) so our custom classes work without @apply -->
+  <!-- Inter font (falls back to system fonts if blocked) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Inline theme: tokens, components, subtle motion -->
   <style>
-    :root { --fg:#1f2937; --muted:#6b7280; --line:#e5e7eb; --primary:#2563eb; --danger:#b91c1c; }
-    body { color: var(--fg); }
-    .container-page { margin-left:auto; margin-right:auto; max-width: 64rem; padding-left:1rem; padding-right:1rem; }
-    .section { margin-bottom: 2rem; }
-    .muted { color: var(--muted); }
-    .card { background:#fff; border:1px solid var(--line); border-radius: 1rem; padding: 1.25rem; box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 1px 1px rgb(0 0 0 / 0.04); }
-    .btn { display:inline-flex; align-items:center; gap:.25rem; border:1px solid #cbd5e1; background:#fff; color:#0f172a; padding:.375rem .75rem; border-radius:.75rem; font-size:.875rem; font-weight:500; box-shadow:0 1px 1px rgb(0 0 0 / 0.04); }
-    .btn:hover { background:#f8fafc; }
-    .btn-primary { border-color: var(--primary); background: var(--primary); color: #fff; }
-    .btn-primary:hover { background:#1d4ed8; }
-    .btn-danger { border-color: var(--danger); background: var(--danger); color: #fff; }
-    .btn-danger:hover { background:#991b1b; }
-    .btn-ghost { border-color: transparent; background: transparent; }
-    .btn-ghost:hover { background:#f1f5f9; }
-    .input { display:block; width:100%; border:1px solid #cbd5e1; background:#fff; color:#0f172a; padding:.5rem .75rem; border-radius:.5rem; font-size:.875rem; }
-    .input:focus { outline: 2px solid var(--primary); outline-offset: 2px; }
-    .label { display:block; font-size:.875rem; font-weight:600; color:#334155; margin-bottom:.25rem; }
-    .help { font-size:.875rem; color: var(--muted); }
-    .link { color:#0a58ca; text-decoration: underline; text-underline-offset: 2px; }
-    .table { width:100%; border-collapse: collapse; font-size:.9rem; }
-    .table th, .table td { border:1px solid var(--line); padding:.5rem .75rem; vertical-align: top; text-align:left; }
-    .table thead th { background:#f8fafc; position: sticky; top: 0; }
-    .chip { display:inline-flex; align-items:center; padding:.125rem .5rem; background:#f1f5f9; border-radius:999px; font-size:.75rem; color:#334155; }
-    .chip-required { background:#fef3c7; color:#92400e; }
-    .badge { display:inline-flex; align-items:center; padding:.125rem .5rem; border-radius:.375rem; font-size:.75rem; font-weight:600; }
-    .badge-draft { background:#f1f5f9; color:#334155; }
-    .badge-public { background:#dcfce7; color:#166534; }
-    .badge-invite { background:#fef3c7; color:#92400e; }
-    .notice { border:1px solid #bfdbfe; background:#eaf2ff; color:#1e3a8a; padding:.5rem .75rem; border-radius:.5rem; }
-    .error { border:1px solid #fecaca; background:#ffe4e6; color:#7f1d1d; padding:.5rem .75rem; border-radius:.5rem; }
+    :root{
+      --bg-page:#F8FAFC;--bg-surface:#FFFFFF;--ink:#0F172A;--muted:#475569;--line:#E2E8F0;--zebra:#F1F5F9;
+      --primary:#2563EB;--primary-hover:#1D4ED8;--ring:#93C5FD;--danger:#B91C1C;--danger-hover:#991B1B;
+      --shadow-card:0 2px 4px rgba(15,23,42,.04),0 1px 1px rgba(15,23,42,.05);
+      --shadow-card-lg:0 8px 24px rgba(15,23,42,.08),0 2px 6px rgba(15,23,42,.06);
+    }
+    html,body{height:100%}
+    body{background:var(--bg-page);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5}
+    ::selection{background:#DBEAFE;color:#111827}
+    h1{font-size:1.75rem;font-weight:700;margin:.25rem 0 .5rem}
+    h2{font-size:1.25rem;font-weight:600;margin:.5rem 0 .5rem}
+
+    .container-page{max-width:1040px;margin:0 auto;padding:0 1rem}
+    .section{margin:2rem 0}
+    .muted{color:var(--muted)}
+
+    /* Header */
+    .app-header{position:sticky;top:0;z-index:20;background:var(--bg-surface);border-bottom:1px solid var(--line);backdrop-filter:saturate(150%) blur(2px)}
+    .brand{font-weight:700;letter-spacing:.2px}
+
+    /* Cards */
+    .card{background:var(--bg-surface);border:1px solid var(--line);border-radius:16px;padding:1.25rem;box-shadow:var(--shadow-card)}
+    .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}
+    .card-sub{font-size:.95rem;color:var(--muted)}
+
+    /* Motion */
+    @media (prefers-reduced-motion:no-preference){
+      .fade-in{opacity:0;transform:translateY(6px);animation:fadeIn .24s ease-out forwards}
+      @keyframes fadeIn{to{opacity:1;transform:none}}
+      .btn{transition:background-color .14s ease, box-shadow .14s ease, transform .06s ease}
+      .btn:active{transform:translateY(1px) scale(.99)}
+      .input{transition:box-shadow .14s ease, border-color .14s ease, background-color .14s ease}
+    }
+
+    /* Buttons */
+    .btn{display:inline-flex;align-items:center;gap:.35rem;border:1px solid #CBD5E1;background:#fff;color:#0f172a;padding:.5rem .9rem;border-radius:12px;font-size:.95rem;font-weight:500;box-shadow:0 1px 1px rgba(15,23,42,.05);text-decoration:none}
+    .btn:hover{background:#F8FAFC}.btn:focus{outline:2px solid var(--ring);outline-offset:2px}
+    .btn-primary{border-color:var(--primary);background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-hover)}
+    .btn-ghost{border-color:transparent;background:transparent}.btn-ghost:hover{background:#EEF2F7}
+
+    /* Forms */
+    .label{display:block;font-size:.9rem;font-weight:600;color:#334155;margin-bottom:.25rem}
+    .field{margin-bottom:.9rem}
+    .input,select,textarea{display:block;width:100%;border:1px solid #CBD5E1;background:#fff;color:#0f172a;padding:.6rem .75rem;border-radius:12px;font-size:.98rem}
+    .input:focus,select:focus,textarea:focus{outline:2px solid var(--ring);outline-offset:2px;box-shadow:0 0 0 3px rgba(147,197,253,.35)}
+    .help{font-size:.88rem;color:var(--muted)}
+
+    /* Notices */
+    .notice{border:1px solid #bfdbfe;background:#eaf2ff;color:#1e3a8a;padding:.65rem .8rem;border-radius:12px}
+    .error{border:1px solid #fecaca;background:#ffe4e6;color:#7f1d1d;padding:.65rem .8rem;border-radius:12px}
+
+    /* Chips */
+    .chip{display:inline-flex;align-items:center;padding:.18rem .55rem;background:#F1F5F9;border-radius:999px;font-size:.78rem;color:#334155}
   </style>
 </head>
-<body class="min-h-full bg-slate-100 font-sans">
-  <header class="bg-white border-b border-slate-200">
+<body class="min-h-full">
+  <% 
+    // Decide where the brand should link.
+    const brandHref = (typeof user !== 'undefined' && user)
+      ? (user.role === 'researcher' ? '/researcher' : '/participant')
+      : '/';
+  %>
+
+  <header class="app-header">
     <div class="container-page flex items-center justify-between py-3">
-      <a href="/" class="text-lg font-semibold">Consent Manager</a>
-      <div class="flex items-center gap-3">
+      <a href="<%= brandHref %>" class="brand text-lg">Consent Manager</a>
+      <nav class="flex items-center gap-3">
         <% if (typeof user !== 'undefined' && user) { %>
-          <% if (user.role === 'researcher') { %>
-            <a class="btn btn-ghost" href="/researcher">Researcher</a>
-          <% } else { %>
-            <a class="btn btn-ghost" href="/participant">Participant</a>
-          <% } %>
+          <!-- Role as a non-clickable badge; no redundant nav link -->
+          <span class="chip" title="Signed in role"><%= user.role %></span>
           <form method="post" action="/logout" class="inline"><button class="btn">Log out</button></form>
         <% } else { %>
-          <a class="btn btn-primary" href="/login">Log in</a>
+          <!-- Only show Login CTA when not already on auth pages -->
+          <a class="btn btn-primary" href="/login" data-cta-login>Log in</a>
         <% } %>
-      </div>
+      </nav>
     </div>
   </header>
 
-  <main class="container-page py-6">
-    <div class="mb-4 text-slate-500"><%= pageTitle %></div>
+  <main class="container-page">
+    <div class="mb-3 muted" data-crumb><%= pageTitle %></div>
     <%- body %>
   </main>
+
+  <!-- Tiny script to hide redundant bits on auth pages -->
+  <script>
+    (function () {
+      try {
+        var p = location.pathname;
+        if (p === '/login' || p === '/signup') {
+          var loginCta = document.querySelector('[data-cta-login]');
+          if (loginCta) loginCta.remove();
+          var crumb = document.querySelector('[data-crumb]');
+          if (crumb) crumb.remove();
+        }
+      } catch (_) {}
+    })();
+  </script>
 </body>
 </html>

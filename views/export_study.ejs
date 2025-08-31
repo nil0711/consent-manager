@@ -5,7 +5,7 @@
   <title>Study Export — <%= study.title %></title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; font-size: 12px; color: #222; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; font-size: 12px; color: #222; line-height: 1.4; }
     h1,h2 { margin: 0 0 6px 0; }
     h1 { font-size: 18px; }
     h2 { font-size: 14px; margin-top: 12px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
@@ -17,7 +17,9 @@
     .small { font-size: 11px; color: #444; }
     .right { text-align: right; }
     .muted { color:#777; }
+    .chip { display:inline-block; padding: 2px 6px; border-radius: 12px; background:#eef2ff; color:#3730a3; font-size:11px; }
     ul { margin: 6px 0; padding-left: 16px; }
+    .nowrap { white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -26,6 +28,7 @@
     Slug: <code><%= study.slug %></code> • Status: <strong><%= study.status %></strong>
     <% if (study.status === 'invite') { %> • Join code: <code><%= study.joinCode || '—' %></code><% } %>
   </p>
+
   <div class="grid">
     <div>
       <h2>Summary</h2>
@@ -36,7 +39,8 @@
     <div>
       <h2>Contact & Retention</h2>
       <p>Email: <a href="mailto:<%= study.contactEmail %>"><%= study.contactEmail %></a></p>
-      <p>Default retention: <%= study.retentionDefaultDays ?? '—' %> days</p>
+      <p>Default retention: <%= (study.retentionDefaultDays ?? '—') %> days</p>
+
       <h2>Categories</h2>
       <table>
         <thead><tr><th>Name</th><th>Required</th><th>Retention</th><th>Description</th></tr></thead>
@@ -45,7 +49,15 @@
           <tr>
             <td><strong><%= c.name %></strong></td>
             <td><%= c.required ? 'Yes' : 'No' %></td>
-            <td><%= c.retentionDays ?? (study.retentionDefaultDays ?? '—') %> days</td>
+            <td>
+              <% if (typeof c.retentionDays === 'number') { %>
+                <%= c.retentionDays %> days
+              <% } else if (typeof study.retentionDefaultDays === 'number') { %>
+                <%= study.retentionDefaultDays %> days
+              <% } else { %>
+                —
+              <% } %>
+            </td>
             <td class="small"><%= c.description || '' %></td>
           </tr>
         <% }) %>
@@ -54,7 +66,67 @@
     </div>
   </div>
 
-  <h2>Consent snapshot</h2>
+  <!-- Participants (overview + detailed table) -->
+  <h2>Participants</h2>
+  <% 
+    const plist = Array.isArray(participants) ? participants : [];
+    let grantedCount = 0, deniedCount = 0, withdrawnCount = 0;
+    plist.forEach(p => {
+      if (p?.withdrawnAt) withdrawnCount++;
+      if (p?.granted) grantedCount++; else deniedCount++;
+    });
+  %>
+  <% if (!plist.length) { %>
+    <p class="muted small">No participant snapshot available here. Use the “Participants” console or the Excel export for full detail.</p>
+  <% } else { %>
+    <p class="small">
+      <span class="chip">Total: <%= plist.length %></span>
+      &nbsp;<span class="chip">Granted: <%= grantedCount %></span>
+      &nbsp;<span class="chip">Denied: <%= deniedCount %></span>
+      &nbsp;<span class="chip">Withdrawn: <%= withdrawnCount %></span>
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Pseudonym</th>
+          <th>Version</th>
+          <th>Granted?</th>
+          <th>Saved</th>
+          <th>Withdrawn</th>
+          <% (study.categories || []).forEach(cat => { %>
+            <th><%= cat.name %></th>
+          <% }) %>
+          <th class="right">Uploads</th>
+          <th>Last activity</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% plist.forEach(p => { %>
+          <tr>
+            <td class="nowrap"><strong><%= p.pseudo || pseudonym(p.participantId) %></strong></td>
+            <td>v<%= p.version %></td>
+            <td><%= p.granted ? 'Yes' : 'No' %></td>
+            <td class="nowrap"><%= p.createdAt ? new Date(p.createdAt).toISOString().replace('T',' ').slice(0,16) : '—' %></td>
+            <td class="nowrap"><%= p.withdrawnAt ? new Date(p.withdrawnAt).toISOString().replace('T',' ').slice(0,16) : '—' %></td>
+            <% 
+              // p.columns is an array aligned with study.categories in /researcher/studies/:slug/participants
+              const cols = Array.isArray(p.columns) ? p.columns : [];
+              (study.categories || []).forEach((cat, idx) => { 
+                const cell = cols[idx] ?? '—';
+            %>
+              <td><%= cell %></td>
+            <% }) %>
+            <td class="right"><%= p.uploadCount ?? 0 %></td>
+            <td class="nowrap"><%= p.lastActivity ? new Date(p.lastActivity).toISOString().replace('T',' ').slice(0,16) : '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <p class="small muted">“Required” means the category is always allowed. A blank/“—” indicates no explicit choice was recorded for a non-required category.</p>
+  <% } %>
+
+  <h2>Consent snapshot (aggregate)</h2>
   <table>
     <thead><tr><th>Category</th><th>Allowed</th><th>Denied</th><th>Notes</th></tr></thead>
     <tbody>
@@ -74,10 +146,10 @@
   <table>
     <thead><tr><th>When</th><th>Participant</th><th>Category</th><th>Name</th><th class="right">Size (MB)</th></tr></thead>
     <tbody>
-    <% uploads.slice(0, 20).forEach(u => { %>
+    <% (uploads || []).slice(0, 20).forEach(u => { %>
       <tr>
-        <td><%= new Date(u.createdAt).toISOString().replace('T',' ').slice(0,16) %></td>
-        <td><%= pseudonym(u.participantId) %></td>
+        <td class="nowrap"><%= new Date(u.createdAt).toISOString().replace('T',' ').slice(0,16) %></td>
+        <td class="nowrap"><%= pseudonym(u.participantId) %></td>
         <td><%= u.category?.name || u.categoryId %></td>
         <td class="small"><%= u.originalName %></td>
         <td class="right"><%= (u.sizeBytes/1024/1024).toFixed(2) %></td>
@@ -89,14 +161,14 @@
 
   <h2>Retention activity</h2>
   <table>
-    <thead><tr><th>When</th><th>UploadId</th><th>Category</th><th>Upload Created</th><th>Retention (days)</th></tr></thead>
+    <thead><tr><th>When</th><th>UploadId</th><th>Category</th><th>Upload Created</th><th class="right">Retention (days)</th></tr></thead>
     <tbody>
-    <% purges.slice(0, 50).forEach(r => { const d = r.details || {}; %>
+    <% (purges || []).slice(0, 50).forEach(r => { const d = r.details || {}; %>
       <tr>
-        <td><%= new Date(r.createdAt).toISOString().replace('T',' ').slice(0,16) %></td>
+        <td class="nowrap"><%= new Date(r.createdAt).toISOString().replace('T',' ').slice(0,16) %></td>
         <td><%= d.uploadId || '' %></td>
         <td><%= d.category || '' %></td>
-        <td><%= d.createdAt ? new Date(d.createdAt).toISOString().replace('T',' ').slice(0,16) : '' %></td>
+        <td class="nowrap"><%= d.createdAt ? new Date(d.createdAt).toISOString().replace('T',' ').slice(0,16) : '' %></td>
         <td class="right"><%= (d.retentionDays ?? '') %></td>
       </tr>
     <% }) %>

@@ -1,15 +1,57 @@
-<section>
-  <h1>Sign up</h1>
-  <% if (error) { %><p class="error"><%= error %></p><% } %>
-  <form method="post" action="/signup">
-    <label>Email <input name="email" type="email" required></label>
-    <label>Password <input name="password" type="password" required minlength="6"></label>
-    <fieldset>
-      <legend>Role</legend>
-      <label><input type="radio" name="role" value="participant" required> Participant</label>
-      <label><input type="radio" name="role" value="researcher"> Researcher</label>
-    </fieldset>
-    <button type="submit">Create account</button>
-  </form>
-  <p>Have an account? <a href="/login">Log in</a></p>
+<section class="section">
+  <div class="max-w-md mx-auto">
+    <div class="card fade-in">
+      <div class="card-header">
+        <h1>Sign up</h1>
+      </div>
+      <p class="card-sub">Create an account to manage or join studies.</p>
+
+      <% if (typeof error !== 'undefined' && error) { %>
+        <div class="error mb-3"><%= error %></div>
+      <% } %>
+      <% if (typeof notice !== 'undefined' && notice) { %>
+        <div class="notice mb-3"><%= notice %></div>
+      <% } %>
+
+      <form method="post" action="/signup" class="mt-4">
+        <div class="field">
+          <label class="label" for="email">Email</label>
+          <input id="email" name="email" type="email" required class="input"
+                 autocomplete="email" value="<%= (typeof email !== 'undefined' && email) ? email : '' %>">
+        </div>
+
+        <div class="field">
+          <label class="label" for="password">Password</label>
+          <input id="password" name="password" type="password" required class="input"
+                 autocomplete="new-password" minlength="6">
+          <p class="help">Use at least 6 characters.</p>
+        </div>
+
+        <fieldset class="field">
+          <legend class="label mb-2">Role</legend>
+          <div class="flex items-center gap-4">
+            <label class="inline-flex items-center gap-2">
+              <input type="radio" name="role" value="participant" required
+                     <%= (typeof role === 'undefined' || role === 'participant') ? 'checked' : '' %> >
+              <span>Participant</span>
+            </label>
+            <label class="inline-flex items-center gap-2">
+              <input type="radio" name="role" value="researcher"
+                     <%= (typeof role !== 'undefined' && role === 'researcher') ? 'checked' : '' %> >
+              <span>Researcher</span>
+            </label>
+          </div>
+          <p class="help mt-1">You can use separate accounts for each role.</p>
+        </fieldset>
+
+        <div class="flex items-center justify-between mt-4">
+          <button type="submit" class="btn btn-primary">Create account</button>
+          <div class="text-sm">
+            <span class="muted">Have an account?</span>
+            <a class="link" href="/login">Log in</a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
 </section>

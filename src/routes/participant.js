@@ -1,83 +1,161 @@
+// src/routes/participant.js
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
-import { requireAuth } from "../lib/mw.js";
+import { requireAuth, requireLogin } from "../lib/mw.js";
+import crypto from "node:crypto";
 
 const router = Router();
 
-// Participant home: enrolled studies + public catalog
-router.get("/participant", requireAuth("participant"), async (req, res) => {
-  const userId = req.session.user.id;
+/* ------------------------------- helpers -------------------------------- */
 
-  // Grab any flash-y messages carried via querystring
-  const notice = req.query.msg || null;
-  const error  = req.query.err || null;
-
-  const enrolled = await prisma.enrollment.findMany({
-    where: { participantId: userId },
-    include: { study: { include: { categories: true } } },
-    orderBy: { createdAt: "desc" }
+async function addAudit(studyId, actorRole, actorId, action, details = {}) {
+  const prev = await prisma.auditLog.findFirst({
+    where: { studyId },
+    orderBy: { createdAt: "desc" },
+    select: { entryHash: true }
   });
+  const createdAt = new Date();
+  const body =
+    (prev?.entryHash || "") +
+    action +
+    JSON.stringify(details) +
+    createdAt.toISOString();
+  const entryHash = crypto.createHash("sha256").update(body).digest("hex");
+  return prisma.auditLog.create({
+    data: {
+      studyId,
+      actorRole,
+      actorId,
+      action,
+      details,
+      prevHash: prev?.entryHash || null,
+      entryHash
+    }
+  });
+}
 
-  const publicStudies = await prisma.study.findMany({
-    where: { status: "public" },
+function normCode(raw) {
+  return (raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+/* ------------------------------- dashboard ------------------------------ */
+
+router.get("/participant", requireAuth("participant"), async (req, res) => {
+  // show enrolled studies; rest of the page (Trending/search) is hydrated by JS
+  const enrolledStudies = await prisma.study.findMany({
+    where: {
+      status: { not: "draft" },
+      enrollments: { some: { participantId: req.session.user.id } }
+    },
     orderBy: { createdAt: "desc" },
     include: { categories: true }
   });
 
   res.render("participant", {
-    title: "Participant",
+    title: "Studies",
     user: req.session.user,
-    enrolledStudies: enrolled.map(e => e.study),
-    publicStudies,
-    notice,
-    error
+    enrolledStudies,
+    // allow page to optionally show a notice/error passed via query
+    notice: req.query.notice || null,
+    error: req.query.error || null
   });
 });
 
-// Join via invite code (robust w/ graceful errors)
-router.post("/join", requireAuth("participant"), async (req, res) => {
+/* ------------------------------ join by code ---------------------------- */
+
+// GET guard so navigating to /participant/join never 404s
+router.get("/participant/join", requireAuth("participant"), (req, res) => {
+  return res.redirect("/participant");
+});
+
+// POST: join a study using a code (usually for invite studies)
+router.post("/participant/join", requireAuth("participant"), async (req, res) => {
   try {
-    const raw = (req.body && req.body.code) ? String(req.body.code) : "";
-    const code = raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-
-    if (!code) {
-      return res.redirect("/participant?err=" + encodeURIComponent("Join code is required."));
+    const code = normCode(req.body?.code);
+    if (code.length < 4 || code.length > 16) {
+      // re-render participant with inline error
+      const enrolledStudies = await prisma.study.findMany({
+        where: {
+          status: { not: "draft" },
+          enrollments: { some: { participantId: req.session.user.id } }
+        },
+        orderBy: { createdAt: "desc" },
+        include: { categories: true }
+      });
+      return res.status(400).render("participant", {
+        title: "Studies",
+        user: req.session.user,
+        enrolledStudies,
+        joinError: "Invalid join code format."
+      });
     }
-    // Optional: basic format check to prevent accidental spaces etc.
-    if (code.length < 6 || code.length > 12) {
-      return res.redirect("/participant?err=" + encodeURIComponent("That code doesn’t look right."));
-    }
 
+    // Find a non-draft study with this code.
+    // We store joinCode uppercased when creating/editing; compare exact after normalization.
     const study = await prisma.study.findFirst({
-      where: { status: "invite", joinCode: code }
+      where: {
+        joinCode: code,
+        status: { in: ["invite", "public"] } // allow code on public if they use one
+      },
+      include: { categories: true }
     });
 
     if (!study) {
-      return res.redirect("/participant?err=" + encodeURIComponent("No invite-only study matches that code."));
+      const enrolledStudies = await prisma.study.findMany({
+        where: {
+          status: { not: "draft" },
+          enrollments: { some: { participantId: req.session.user.id } }
+        },
+        orderBy: { createdAt: "desc" },
+        include: { categories: true }
+      });
+      return res.status(404).render("participant", {
+        title: "Studies",
+        user: req.session.user,
+        enrolledStudies,
+        joinError: "No study found for that join code."
+      });
     }
 
+    // Enroll (idempotent)
     await prisma.enrollment.upsert({
-      where: { studyId_participantId: { studyId: study.id, participantId: req.session.user.id } },
+      where: {
+        studyId_participantId: {
+          studyId: study.id,
+          participantId: req.session.user.id
+        }
+      },
       create: { studyId: study.id, participantId: req.session.user.id },
       update: {}
     });
 
-    await prisma.auditLog.create({
-      data: {
-        studyId: study.id,
-        actorRole: "participant",
-        actorId: req.session.user.id,
-        action: "ENROLLED",
-        details: { via: "code" }
-      }
-    });
+    await addAudit(
+      study.id,
+      "participant",
+      req.session.user.id,
+      "ENROLLED",
+      { via: "join_code", code }
+    );
 
-    // success: go straight to the study
+    // Go straight to the study page
     return res.redirect(`/s/${study.slug}`);
   } catch (e) {
-    console.error("[/join] failed", e);
-    // fall back to a friendly error on the dashboard
-    return res.redirect("/participant?err=" + encodeURIComponent("Join failed. Please try again."));
+    console.error("[participant/join]", e);
+    // Render a friendly error on the page
+    const enrolledStudies = await prisma.study.findMany({
+      where: {
+        status: { not: "draft" },
+        enrollments: { some: { participantId: req.session.user.id } }
+      },
+      orderBy: { createdAt: "desc" },
+      include: { categories: true }
+    });
+    return res.status(500).render("participant", {
+      title: "Studies",
+      user: req.session.user,
+      enrolledStudies,
+      joinError: "Unexpected error joining study. Please try again."
+    });
   }
 });
 

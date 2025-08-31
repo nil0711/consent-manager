@@ -1,44 +1,150 @@
-<section>
-  <h1>Create study</h1>
-  <% if (error) { %><p class="error"><%= error %></p><% } %>
+<section class="section">
+  <div class="container-page grid gap-6">
 
-  <form method="post" action="/researcher/studies/new">
-    <label>Title <input name="title" required></label>
-    <label>Summary <textarea name="summary" required></textarea></label>
-    <label>Purpose <textarea name="purpose" required></textarea></label>
-    <label>Contact email <input name="contactEmail" type="email" required></label>
-    <label>Default retention days (optional) <input name="retentionDays" type="number" min="0"></label>
+    <div class="card">
+      <div class="card-header">
+        <h1 class="text-lg font-semibold">Create study</h1>
+        <a class="btn" href="/researcher">Cancel</a>
+      </div>
 
-    <fieldset>
-      <legend>Status</legend>
-      <select name="status">
-        <option value="public">public</option>
-        <option value="invite">invite</option>
-        <option value="draft">draft</option>
-      </select>
-      <p class="help">Invite mode uses a join code; draft is visible only to you.</p>
-    </fieldset>
+      <% if (typeof error === 'string' && error) { %>
+        <div class="error mb-3"><%= error %></div>
+      <% } %>
 
-    <label>Join code (optional)
-      <input name="joinCode" placeholder="Leave blank to auto-generate for invite">
-    </label>
+      <form method="post" action="/researcher/studies/new" class="grid gap-5">
 
-    <fieldset>
-      <legend>Data categories (3 quick defaults)</legend>
-      <label>Category 1 name <input name="c1_name" value="Email"></label>
-      <label>Category 1 description <input name="c1_desc"></label>
-      <label><input type="checkbox" name="c1_req"> Required</label>
+        <!-- Basics -->
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="grid gap-3">
+            <label class="label">Title
+              <input class="input" name="title" required
+                     value="<%= (values?.title ?? '') %>">
+            </label>
 
-      <label>Category 2 name <input name="c2_name" value="Usage Logs"></label>
-      <label>Category 2 description <input name="c2_desc"></label>
-      <label><input type="checkbox" name="c2_req"> Required</label>
+            <label class="label">Purpose
+              <textarea class="input" name="purpose" rows="3" required><%= (values?.purpose ?? '') %></textarea>
+            </label>
+          </div>
 
-      <label>Category 3 name <input name="c3_name" value="Accelerometer"></label>
-      <label>Category 3 description <input name="c3_desc"></label>
-      <label><input type="checkbox" name="c3_req"> Required</label>
-    </fieldset>
+          <div class="grid gap-3">
+            <label class="label">Summary
+              <textarea class="input" name="summary" rows="3" required><%= (values?.summary ?? '') %></textarea>
+            </label>
 
-    <button type="submit">Create</button>
-    <a href="/researcher">Cancel</a>
-  </form>
+            <div class="grid md:grid-cols-2 gap-3">
+              <label class="label">Contact email
+                <input class="input" type="email" name="contactEmail" required
+                       value="<%= (values?.contactEmail ?? '') %>">
+              </label>
+              <label class="label">Default retention days (optional)
+                <input class="input" type="number" min="0" name="retentionDays"
+                       value="<%= (values?.retentionDays ?? '') %>">
+              </label>
+            </div>
+            <p class="help -mt-2">Uploads without a category override will be purged after this many days.</p>
+          </div>
+        </div>
+
+        <!-- Status & join code -->
+        <div class="grid md:grid-cols-[1fr,1fr] gap-4">
+          <label class="label">Status
+            <select class="input" name="status" id="status-select">
+              <option value="public" <%= (values?.status ?? 'public') === 'public' ? 'selected' : '' %>>public</option>
+              <option value="invite" <%= (values?.status) === 'invite' ? 'selected' : '' %>>invite</option>
+              <option value="draft"  <%= (values?.status) === 'draft'  ? 'selected' : '' %>>draft</option>
+            </select>
+          </label>
+
+          <div id="join-wrapper">
+            <label class="label">Join code (optional for invite)
+              <input class="input" name="joinCode"
+                     placeholder="Leave blank to auto-generate"
+                     value="<%= (values?.joinCode ?? '') %>">
+            </label>
+            <p class="help -mt-2">Invite mode uses a join code; draft is visible only to you.</p>
+          </div>
+        </div>
+
+        <!-- Categories -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="text-lg font-semibold">Data categories</h2>
+            <span class="chip">3 quick defaults</span>
+          </div>
+
+          <div class="grid md:grid-cols-3 gap-4">
+            <!-- Cat 1 -->
+            <div class="border border-[var(--line)] rounded-xl p-3 bg-white grid gap-3">
+              <div class="font-medium">Category 1</div>
+              <label class="label">Name
+                <input class="input" name="c1_name" value="<%= (values?.c1_name ?? 'Email') %>">
+              </label>
+              <label class="label">Description
+                <input class="input" name="c1_desc" value="<%= (values?.c1_desc ?? '') %>">
+              </label>
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="c1_req" name="c1_req" <%= (values?.c1_req ? 'checked' : '') %> >
+                <label for="c1_req">Required</label>
+              </div>
+              <label class="label">Retention days (optional)
+                <input class="input" type="number" min="0" name="c1_ret" value="<%= (values?.c1_ret ?? '') %>">
+              </label>
+            </div>
+
+            <!-- Cat 2 -->
+            <div class="border border-[var(--line)] rounded-xl p-3 bg-white grid gap-3">
+              <div class="font-medium">Category 2</div>
+              <label class="label">Name
+                <input class="input" name="c2_name" value="<%= (values?.c2_name ?? 'Usage Logs') %>">
+              </label>
+              <label class="label">Description
+                <input class="input" name="c2_desc" value="<%= (values?.c2_desc ?? '') %>">
+              </label>
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="c2_req" name="c2_req" <%= (values?.c2_req ? 'checked' : '') %> >
+                <label for="c2_req">Required</label>
+              </div>
+              <label class="label">Retention days (optional)
+                <input class="input" type="number" min="0" name="c2_ret" value="<%= (values?.c2_ret ?? '') %>">
+              </label>
+            </div>
+
+            <!-- Cat 3 -->
+            <div class="border border-[var(--line)] rounded-xl p-3 bg-white grid gap-3">
+              <div class="font-medium">Category 3</div>
+              <label class="label">Name
+                <input class="input" name="c3_name" value="<%= (values?.c3_name ?? 'Accelerometer') %>">
+              </label>
+              <label class="label">Description
+                <input class="input" name="c3_desc" value="<%= (values?.c3_desc ?? '') %>">
+              </label>
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="c3_req" name="c3_req" <%= (values?.c3_req ? 'checked' : '') %> >
+                <label for="c3_req">Required</label>
+              </div>
+              <label class="label">Retention days (optional)
+                <input class="input" type="number" min="0" name="c3_ret" value="<%= (values?.c3_ret ?? '') %>">
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-primary" type="submit">Create</button>
+          <a class="btn" href="/researcher">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      var sel = document.getElementById('status-select');
+      var wrap = document.getElementById('join-wrapper');
+      function toggleJoin(){ wrap.style.display = sel.value === 'invite' ? '' : 'none'; }
+      toggleJoin();
+      sel.addEventListener('change', toggleJoin, { passive: true });
+    })();
+  </script>
 </section>

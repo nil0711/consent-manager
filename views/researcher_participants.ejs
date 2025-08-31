@@ -1,49 +1,65 @@
-<section>
-  <h1>Participants — <%= study.title %></h1>
-  <p class="meta">Slug: <code><%= study.slug %></code></p>
+<section class="section">
+  <div class="container-page grid gap-6">
 
-  <div style="margin:8px 0; display:flex; gap:.5rem; flex-wrap:wrap;">
-    <!-- Keep the old URL but clearly label it as Excel -->
-    <a class="button" href="/researcher/studies/<%= study.slug %>/participants.csv"><strong>Download Excel</strong></a>
-    <a class="button" href="/researcher">← Back to your studies</a>
+    <div class="card fade-in">
+      <div class="card-header">
+        <div class="min-w-0">
+          <h1 class="text-lg font-semibold">Participants — <%= study.title %></h1>
+          <div class="card-sub">Slug: <code><%= study.slug %></code></div>
+        </div>
+        <div class="flex gap-2">
+          <a class="btn" href="/researcher/studies/<%= study.slug %>/participants.csv"><strong>Download Excel</strong></a>
+          <a class="btn" href="/researcher">← Back to your studies</a>
+        </div>
+      </div>
+
+      <% if (!participants.length) { %>
+        <div class="notice">No participants yet.</div>
+      <% } else { %>
+        <div class="overflow-x-auto mt-2">
+          <table class="w-full" style="border-collapse:collapse;border:1px solid var(--line);border-radius:12px;overflow:hidden">
+            <thead>
+              <tr style="background:var(--zebra)">
+                <th class="p-2 text-left">Participant</th>
+                <th class="p-2 text-left">Version</th>
+                <th class="p-2 text-left">Granted?</th>
+                <th class="p-2 text-left">Saved</th>
+                <th class="p-2 text-left">Withdrawn</th>
+                <% categories.forEach(c => { %>
+                  <th class="p-2 text-left"><%= c.name %></th>
+                <% }) %>
+                <th class="p-2 text-left">Uploads</th>
+                <th class="p-2 text-left">Last activity</th>
+                <th class="p-2 text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% participants.forEach(p => { %>
+                <tr style="border-top:1px solid var(--line)">
+                  <td class="p-2 font-medium"><code><%= p.pseudo %></code></td>
+                  <td class="p-2">v<%= p.version %></td>
+                  <td class="p-2">
+                    <span class="chip"><%= p.granted ? 'Yes' : 'No' %></span>
+                  </td>
+                  <td class="p-2"><%= new Date(p.createdAt).toLocaleString() %></td>
+                  <td class="p-2"><%= p.withdrawnAt ? new Date(p.withdrawnAt).toLocaleString() : '—' %></td>
+
+                  <% p.columns.forEach(col => { %>
+                    <td class="p-2"><%= col %></td>
+                  <% }) %>
+
+                  <td class="p-2"><%= p.uploadCount %></td>
+                  <td class="p-2"><%= p.uploadCount ? new Date(p.lastActivity).toLocaleString() : '—' %></td>
+                  <td class="p-2">
+                    <a class="btn" href="/researcher/studies/<%= study.slug %>/participants/<%= p.participantId %>">View</a>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
   </div>
-
-  <% if (!participants.length) { %>
-    <p>No participants yet.</p>
-  <% } else { %>
-    <table>
-      <thead>
-        <tr>
-          <th>Participant</th>
-          <th>Version</th>
-          <th>Granted</th>
-          <th>Created</th>
-          <th>Withdrawn</th>
-          <% categories.forEach(c => { %>
-            <th><%= c.name %></th>
-          <% }) %>
-          <th>Uploads</th>
-          <th>Last activity</th>
-          <th>Detail</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% participants.forEach(p => { %>
-          <tr>
-            <td><strong><%= p.pseudo %></strong></td>
-            <td><%= p.version %></td>
-            <td><%= p.granted ? 'Yes' : 'No' %></td>
-            <td><%= new Date(p.createdAt).toLocaleString() %></td>
-            <td><%= p.withdrawnAt ? new Date(p.withdrawnAt).toLocaleString() : '—' %></td>
-            <% p.columns.forEach(col => { %>
-              <td><%= col %></td>
-            <% }) %>
-            <td><%= p.uploadCount %></td>
-            <td><%= p.uploadCount ? new Date(p.lastActivity).toLocaleString() : '—' %></td>
-            <td><a href="/researcher/studies/<%= study.slug %>/participants/<%= p.participantId %>">View</a></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  <% } %>
 </section>

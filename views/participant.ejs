@@ -1,47 +1,182 @@
-<section>
-  <h1>Studies</h1>
-  <p>Signed in as <strong><%= user.email %></strong></p>
+<section class="section">
+  <div class="container-page grid gap-6">
 
-  <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
-  <% if (error)  { %><p class="error"><%= error  %></p><% } %>
+    <!-- Header: Tabs + Search -->
+    <div class="card fade-in"
+         style="position: sticky; top: var(--space-3); z-index: 10; backdrop-filter: saturate(180%) blur(8px); background: rgba(255,255,255,0.85);">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-xl font-semibold">Studies</h1>
 
-  <h2>Join a study</h2>
-  <form method="post" action="/join" style="display:flex; gap:.5rem; align-items:center;">
-    <label style="flex:1">Enter join code
-      <input name="code" placeholder="e.g., 8CHRCODE" required>
-    </label>
-    <button type="submit">Join</button>
-  </form>
+        <div class="flex items-center gap-2" role="tablist" aria-label="Study sections">
+          <button id="tab-my" class="btn" role="tab" aria-selected="true" aria-controls="panel-my">My studies</button>
+          <button id="tab-explore" class="btn" role="tab" aria-selected="false" aria-controls="panel-explore">Explore</button>
+        </div>
+      </div>
 
-  <h2 style="margin-top:1rem;">Your enrolled studies</h2>
-  <% if (!enrolledStudies.length) { %>
-    <p class="meta">You’re not enrolled in any invite-only studies yet.</p>
-  <% } else { %>
-    <ul>
-      <% enrolledStudies.forEach(s => { %>
-        <li class="box">
-          <strong><a href="/s/<%= s.slug %>"><%= s.title %></a></strong>
-          <span class="meta"> — invite</span>
-          <div><%= s.summary %></div>
-        </li>
-      <% }) %>
-    </ul>
-  <% } %>
+      <div class="field mt-3">
+        <label class="label" for="global-search">Search</label>
+        <div class="flex items-center gap-2">
+          <input id="global-search"
+                 class="input"
+                 placeholder="Search by title… "
+                 autocomplete="off">
+          <button id="search-btn" type="button" class="btn btn-primary">Search</button>
+          <button id="clear-btn" type="button" class="btn">Clear</button>
+        </div>
+        <p class="help">Live results as you type (2+ letters). When empty, you’ll see Trending and your enrollments.</p>
+      </div>
+    </div>
 
-  <h2 style="margin-top:1rem;">Public studies</h2>
-  <% if (!publicStudies.length) { %>
-    <p>No public studies right now.</p>
-  <% } else { %>
-    <ul>
-      <% publicStudies.forEach(s => { %>
-        <li class="box">
-          <strong><a href="/s/<%= s.slug %>"><%= s.title %></a></strong>
-          <span class="meta"> — public</span>
-          <div><%= s.summary %></div>
-        </li>
-      <% }) %>
-    </ul>
-  <% } %>
+    <!-- Join a study -->
+    <div class="card fade-in">
+      <div class="card-header">
+        <h2 class="text-lg font-semibold">Join a study</h2>
+      </div>
+      <p class="card-sub mb-4">Enter the join code you received from a researcher.</p>
 
-  <form method="post" action="/logout" style="margin-top:1rem;"><button>Log out</button></form>
+      <% if ((typeof error !== 'undefined' && error) || (typeof joinError !== 'undefined' && joinError)) { %>
+        <div class="error mb-3"><%= (typeof joinError !== 'undefined' && joinError) ? joinError : error %></div>
+      <% } %>
+      <% if ((typeof notice !== 'undefined' && notice) || (typeof joinNotice !== 'undefined' && joinNotice)) { %>
+        <div class="notice mb-3"><%= (typeof joinNotice !== 'undefined' && joinNotice) ? joinNotice : notice %></div>
+      <% } %>
+
+      <!-- Aligned input + button in the same row -->
+      <form method="post" action="/participant/join" onsubmit="return window.__joinSubmit && window.__joinSubmit()">
+        <div class="field max-w-[720px]">
+          <label class="label" for="join-code">Join code</label>
+          <div class="flex items-center gap-2">
+            <input id="join-code" name="code" placeholder="e.g., FJHJG or ABCD-1234"
+                   class="input font-mono tracking-wider" autocomplete="off" spellcheck="false">
+            <button type="submit" id="join-btn" class="btn btn-primary" disabled>Join</button>
+          </div>
+          <p class="help">Not case-sensitive. Dashes/spaces OK.</p>
+        </div>
+      </form>
+    </div>
+
+    <%
+      const enrolledList = (typeof enrolledStudies !== 'undefined' && Array.isArray(enrolledStudies)) ? enrolledStudies
+                         : (typeof enrolled !== 'undefined' && Array.isArray(enrolled)) ? enrolled
+                         : (typeof myStudies !== 'undefined' && Array.isArray(myStudies)) ? myStudies
+                         : [];
+      const publicList = []; // hide default explore content on first load
+
+      function statusChip(s){
+        const st = (s && (s.status || s.visibility || '')).toString().toLowerCase();
+        if (st === 'public') return '<span class="chip">public</span>';
+        if (st === 'invite') return '<span class="chip">invite</span>';
+        return '';
+      }
+      function categoriesLine(s) {
+        const cats = (s && (s.categories || s.dataCategories || [])) || [];
+        if (!Array.isArray(cats) || cats.length === 0) return '';
+        const names = cats.map(c => (typeof c === 'string' ? c : (c.name || c.title || 'Category')) );
+        return names.slice(0,3).join(' • ') + (names.length > 3 ? ' +' + (names.length-3) : '');
+      }
+      function summaryLine(s) {
+        const sum = (s && (s.summary || s.purpose || s.description)) || '';
+        return sum || '';
+      }
+    %>
+
+    <!-- Trending -->
+    <div id="trending-card" class="card fade-in">
+      <div class="card-header">
+        <h2>Trending</h2>
+        <span id="trending-count" class="chip">0</span>
+      </div>
+
+      <div id="trending-empty" class="muted">Loading popular studies…</div>
+      <div id="trending-list" class="grid gap-3" style="display:none"></div>
+    </div>
+
+    <!-- My studies -->
+    <div id="panel-my" role="tabpanel" aria-labelledby="tab-my" class="card fade-in">
+      <div class="card-header">
+        <h2>My studies</h2>
+        <span id="my-count" class="chip"><%= enrolledList.length %></span>
+      </div>
+
+      <div id="my-empty" class="muted" style="<%= enrolledList.length ? 'display:none' : '' %>">
+        You haven’t enrolled in any studies yet.
+      </div>
+
+      <div id="my-list" class="grid gap-3" style="<%= enrolledList.length ? '' : 'display:none' %>">
+        <% enrolledList.forEach(function(s){ %>
+          <div class="border border-[var(--line)] rounded-xl p-3 bg-white flex items-start justify-between gap-4"
+               data-card
+               data-slug="<%= s.slug %>"
+               data-search="<%= ((s.title || s.slug) + ' ' + summaryLine(s) + ' ' + categoriesLine(s)).toLowerCase() %>">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <a class="font-semibold hover:underline" href="/s/<%= s.slug %>"><%= s.title || s.slug %></a>
+                <%- statusChip(s) %>
+              </div>
+              <% if (summaryLine(s)) { %>
+                <div class="muted truncate max-w-[60ch]"><%= summaryLine(s) %></div>
+              <% } %>
+              <% if (categoriesLine(s)) { %>
+                <div class="text-sm mt-1"><%= categoriesLine(s) %></div>
+              <% } %>
+            </div>
+            <div class="shrink-0">
+              <a class="btn" href="/s/<%= s.slug %>">View</a>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <!-- Explore (hidden until there is a query) -->
+    <div id="panel-explore" role="tabpanel" aria-labelledby="tab-explore" class="card fade-in" style="display:none">
+      <div class="card-header">
+        <h2>Results</h2>
+        <span id="explore-count" class="chip">0</span>
+      </div>
+
+      <div id="explore-empty" class="muted">Type to search.</div>
+      <div id="explore-list" class="grid gap-3" style="display:none"></div>
+    </div>
+
+  </div>
+  <script src="/js/participant_search.js" defer></script>
+
 </section>
+
+<script>
+  // Tabs + improved join-code UX
+  (function(){
+    const tabMy = document.getElementById('tab-my');
+    const tabEx = document.getElementById('tab-explore');
+    const panelMy = document.getElementById('panel-my');
+    const panelEx = document.getElementById('panel-explore');
+    function setTab(which){
+      const showMy = which === 'my';
+      tabMy && tabMy.setAttribute('aria-selected', showMy);
+      tabEx && tabEx.setAttribute('aria-selected', !showMy);
+      if (panelMy) panelMy.style.display = showMy ? '' : 'none';
+      if (panelEx) panelEx.style.display = showMy ? 'none' : '';
+    }
+    tabMy && tabMy.addEventListener('click', ()=>setTab('my'));
+    tabEx && tabEx.addEventListener('click', ()=>setTab('explore'));
+    setTab('my');
+
+    // Join code: allow 4–16 alphanumerics; dashes/spaces allowed in UI.
+    try {
+      var input = document.getElementById('join-code');
+      var btn = document.getElementById('join-btn');
+      if (input && btn) {
+        function upd(){
+          var raw = (input.value || '');
+          var canon = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+          btn.disabled = (canon.length < 4 || canon.length > 16);
+        }
+        input.addEventListener('input', upd);
+        input.addEventListener('blur', upd);
+        upd();
+        window.__joinSubmit = function(){ upd(); return !btn.disabled; };
+      }
+    } catch(_) {}
+  })();
+</script>

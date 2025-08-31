@@ -12,7 +12,7 @@ import { checkFileSafety } from "../lib/mime.js";
 
 const router = Router();
 
-/* --------------------------------- utils ---------------------------------- */
+/* --------------------------------- helpers -------------------------------- */
 
 async function addAudit(studyId, actorRole, actorId, action, details = {}) {
   const prev = await prisma.auditLog.findFirst({
@@ -53,43 +53,45 @@ async function isEnrolled(studyId, participantId) {
   return !!e;
 }
 
+/** Render the receipt as a clean PDF (no site chrome) */
 async function renderReceiptPdf(res, study, consent, filenameBase, nowIso) {
   return new Promise((resolve, reject) => {
-    res.render("receipt_print", {
-      study,
-      consent,
-      user: res.req.session.user,
-      nowIso: nowIso || new Date().toISOString()
-    }, async (err, html) => {
-      if (err) return reject(err);
-      try {
-        const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
-        const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: "networkidle0" });
-        const pdf = await page.pdf({
-          format: "A4",
-          printBackground: true,
-          margin: { top: "12mm", right: "12mm", bottom: "16mm", left: "12mm" },
-          displayHeaderFooter: true,
-          headerTemplate: `<div style="font-size:8px;margin-left:12mm;">Receipt v${consent.version} — ${study.title}</div>`,
-          footerTemplate: `<div style="font-size:8px; margin:0 12mm; width:100%; display:flex; justify-content:space-between;">
-            <span class="date"></span><span class="pageNumber"></span>/<span class="totalPages"></span>
-          </div>`
-        });
-        await browser.close();
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.pdf"`);
-        res.end(pdf);
-        resolve();
-      } catch (e) {
-        reject(e);
+    res.render(
+      "receipt_print",
+      {
+        layout: false,                // <- critical: render without app layout
+        study,
+        consent,
+        user: res.req.session.user,
+        nowIso: nowIso || new Date().toISOString()
+      },
+      async (err, html) => {
+        if (err) return reject(err);
+        try {
+          const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
+          const page = await browser.newPage();
+          await page.setContent(html, { waitUntil: "networkidle0" });
+          const pdf = await page.pdf({
+            format: "A4",
+            printBackground: true,
+            margin: { top: "12mm", right: "12mm", bottom: "16mm", left: "12mm" }
+          });
+          await browser.close();
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.pdf"`);
+          res.end(pdf);
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
       }
-    });
+    );
   });
 }
 
-/* --------------------------------- routes --------------------------------- */
+/* ---------------------------------- views --------------------------------- */
 
+// View a study
 router.get("/s/:slug", requireLogin, async (req, res) => {
   const study = await prisma.study.findUnique({
     where: { slug: req.params.slug },
@@ -97,31 +99,29 @@ router.get("/s/:slug", requireLogin, async (req, res) => {
   });
   if (!study) return res.status(404).send("Study not found");
 
-  if (req.session.user.role === "researcher") {
-    if (study.ownerId !== req.session.user.id) return res.status(403).send("Forbidden");
-  } else {
-    if (study.status === "draft") return res.status(403).send("This study is not public.");
-    if (study.status === "invite") {
-      const ok = await isEnrolled(study.id, req.session.user.id);
-      if (!ok) {
-        return res.render("enroll_gate", {
-          title: "Enroll to access",
-          user: req.session.user,
-          study,
-          error: null
-        });
-      }
-    }
+  // Researcher can only view own study
+  if (req.session.user.role === "researcher" && study.ownerId !== req.session.user.id) {
+    return res.status(403).send("Forbidden");
+  }
+  // Participants can view any non-draft study (invite can be viewed even if not enrolled)
+  if (req.session.user.role === "participant" && study.status === "draft") {
+    return res.status(403).send("This study is not public.");
   }
 
   let latestConsent = null;
   let myUploads = [];
+  let enrolled = false;
+
   if (req.session.user.role === "participant") {
+    enrolled = await isEnrolled(study.id, req.session.user.id);
+
     latestConsent = await prisma.consent.findFirst({
       where: { studyId: study.id, participantId: req.session.user.id },
       orderBy: { version: "desc" },
       include: { choices: true }
     });
+
+    // Uploads are hidden in the UI, but keeping fetch in case you re-enable
     myUploads = await prisma.upload.findMany({
       where: { studyId: study.id, participantId: req.session.user.id, deletedAt: null },
       include: { category: true },
@@ -135,32 +135,36 @@ router.get("/s/:slug", requireLogin, async (req, res) => {
     study,
     latestConsent,
     myUploads,
+    enrolled,
     notice: null,
     error: null
   });
 });
 
+/* ---------------------------- enroll / unenroll --------------------------- */
+
+// Enroll (public or invite). If invite & a join code is set, require it.
 router.post("/s/:slug/enroll", requireAuth("participant"), async (req, res) => {
   const study = await prisma.study.findUnique({ where: { slug: req.params.slug } });
   if (!study) return res.status(404).send("Study not found");
-  if (study.status !== "invite") return res.status(400).send("Enrollment not required for this study.");
 
-  const code = (req.body?.code || "").trim().toUpperCase();
-  if (!code) {
-    return res.render("enroll_gate", {
-      title: "Enroll to access",
-      user: req.session.user,
-      study,
-      error: "Join code is required."
-    });
-  }
-  if (code !== (study.joinCode || "").toUpperCase()) {
-    return res.render("enroll_gate", {
-      title: "Enroll to access",
-      user: req.session.user,
-      study,
-      error: "Invalid join code."
-    });
+  const codeSupplied = (req.body?.code || "").trim();
+  const codeSet = (study.joinCode || "").trim();
+
+  if ((study.status || "").toLowerCase() === "invite" && codeSet) {
+    if (codeSupplied.toUpperCase() !== codeSet.toUpperCase()) {
+      // Render back with inline error
+      return res.render("study_view", {
+        title: study.title,
+        user: req.session.user,
+        study,
+        latestConsent: null,
+        myUploads: [],
+        enrolled: false,
+        notice: null,
+        error: "Invalid join code."
+      });
+    }
   }
 
   await prisma.enrollment.upsert({
@@ -173,18 +177,30 @@ router.post("/s/:slug/enroll", requireAuth("participant"), async (req, res) => {
   res.redirect(`/s/${study.slug}`);
 });
 
+// Unenroll (allowed regardless of study status)
+router.post("/s/:slug/unenroll", requireAuth("participant"), async (req, res) => {
+  const study = await prisma.study.findUnique({ where: { slug: req.params.slug } });
+  if (!study) return res.status(404).send("Study not found");
+
+  await prisma.enrollment.deleteMany({
+    where: { studyId: study.id, participantId: req.session.user.id }
+  });
+  await addAudit(study.id, "participant", req.session.user.id, "UNENROLLED", { via: "study_page" });
+
+  res.redirect(`/s/${study.slug}`);
+});
+
+/* --------------------------- consent / withdraw --------------------------- */
+
+// Save choices (always allowed; versions receipts)
 router.post("/s/:slug/consent", requireAuth("participant"), async (req, res) => {
   const study = await prisma.study.findUnique({
     where: { slug: req.params.slug },
     include: { categories: true }
   });
   if (!study) return res.status(404).send("Study not found");
-  if (study.status === "invite") {
-    const ok = await isEnrolled(study.id, req.session.user.id);
-    if (!ok) return res.status(403).send("Enroll first to give consent.");
-  }
 
-  const decisions = study.categories.map((c) => {
+  const decisions = study.categories.map(c => {
     const allowed = c.required ? true : Boolean(req.body[`cat_${c.id}`]);
     return { categoryId: c.id, allowed };
   });
@@ -194,24 +210,23 @@ router.post("/s/:slug/consent", requireAuth("participant"), async (req, res) => 
     orderBy: { version: "desc" }
   });
   const version = prev ? prev.version + 1 : 1;
-  const granted = decisions.some((d) => d.allowed);
+  const granted = decisions.some(d => d.allowed);
 
-  const receiptBase = {
+  const base = {
     receipt_version: 1,
     study: { slug: study.slug, title: study.title, version: study.version, contact: study.contactEmail },
     participant: { pseudonymous_id: req.session.user.id },
-    decisions: decisions.map((d) => {
-      const cat = study.categories.find((c) => c.id === d.categoryId);
+    decisions: decisions.map(d => {
+      const cat = study.categories.find(c => c.id === d.categoryId);
       return { category: cat?.name || d.categoryId, allowed: d.allowed };
     }),
     retention: { default_days: study.retentionDefaultDays },
     effective_at: new Date().toISOString(),
     withdrawal: null
   };
-  const hash = crypto.createHash("sha256").update(JSON.stringify(receiptBase)).digest("hex");
-  const receipt = { ...receiptBase, receipt_hash: `sha256:${hash}` };
+  const hash = crypto.createHash("sha256").update(JSON.stringify(base)).digest("hex");
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async tx => {
     await tx.consent.create({
       data: {
         studyId: study.id,
@@ -220,113 +235,198 @@ router.post("/s/:slug/consent", requireAuth("participant"), async (req, res) => 
         granted,
         withdrawnAt: null,
         receiptHash: `sha256:${hash}`,
-        receiptJson: receipt,
-        choices: {
-          create: decisions.map((d) => ({ categoryId: d.categoryId, allowed: d.allowed }))
-        }
+        receiptJson: { ...base, receipt_hash: `sha256:${hash}` },
+        choices: { create: decisions.map(d => ({ categoryId: d.categoryId, allowed: d.allowed })) }
       }
     });
     await addAudit(study.id, "participant", req.session.user.id, prev ? "CONSENT_EDITED" : "CONSENT_GIVEN", {
-      version, granted, decisions
+      version,
+      granted,
+      decisions
     });
   });
 
-  const latestConsent = await prisma.consent.findFirst({
-    where: { studyId: study.id, participantId: req.session.user.id },
-    orderBy: { version: "desc" },
-    include: { choices: true }
-  });
-  const myUploads = await prisma.upload.findMany({
-    where: { studyId: study.id, participantId: req.session.user.id, deletedAt: null },
-    include: { category: true },
-    orderBy: { createdAt: "desc" }
-  });
+  const [latestConsent, myUploads, enrolled] = await Promise.all([
+    prisma.consent.findFirst({
+      where: { studyId: study.id, participantId: req.session.user.id },
+      orderBy: { version: "desc" },
+      include: { choices: true }
+    }),
+    prisma.upload.findMany({
+      where: { studyId: study.id, participantId: req.session.user.id, deletedAt: null },
+      include: { category: true },
+      orderBy: { createdAt: "desc" }
+    }),
+    isEnrolled(study.id, req.session.user.id)
+  ]);
 
-  return res.render("study_view", {
+  res.render("study_view", {
     title: study.title,
     user: req.session.user,
     study,
     latestConsent,
     myUploads,
+    enrolled,
     notice: `Choices saved (v${version}).`,
     error: null
   });
 });
 
+// Withdraw (deny all)
 router.post("/s/:slug/withdraw", requireAuth("participant"), async (req, res) => {
   const study = await prisma.study.findUnique({
     where: { slug: req.params.slug },
     include: { categories: true }
   });
   if (!study) return res.status(404).send("Study not found");
-  if (study.status === "invite") {
-    const ok = await isEnrolled(study.id, req.session.user.id);
-    if (!ok) return res.status(403).send("Enroll first.");
-  }
 
-  const decisions = study.categories.map((c) => ({ categoryId: c.id, allowed: false }));
+  const decisions = study.categories.map(c => ({ categoryId: c.id, allowed: false }));
   const prev = await prisma.consent.findFirst({
     where: { studyId: study.id, participantId: req.session.user.id },
     orderBy: { version: "desc" }
   });
   const version = prev ? prev.version + 1 : 1;
 
-  const receiptBase = {
+  const nowIso = new Date().toISOString();
+  const base = {
     receipt_version: 1,
     study: { slug: study.slug, title: study.title, version: study.version, contact: study.contactEmail },
     participant: { pseudonymous_id: req.session.user.id },
-    decisions: decisions.map((d) => {
-      const cat = study.categories.find((c) => c.id === d.categoryId);
+    decisions: decisions.map(d => {
+      const cat = study.categories.find(c => c.id === d.categoryId);
       return { category: cat?.name || d.categoryId, allowed: d.allowed };
     }),
     retention: { default_days: study.retentionDefaultDays },
-    effective_at: new Date().toISOString(),
-    withdrawal: new Date().toISOString()
+    effective_at: nowIso,
+    withdrawal: nowIso
   };
-  const hash = crypto.createHash("sha256").update(JSON.stringify(receiptBase)).digest("hex");
-  const receipt = { ...receiptBase, receipt_hash: `sha256:${hash}` };
+  const hash = crypto.createHash("sha256").update(JSON.stringify(base)).digest("hex");
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async tx => {
     await tx.consent.create({
       data: {
         studyId: study.id,
         participantId: req.session.user.id,
         version,
         granted: false,
-        withdrawnAt: new Date(),
+        withdrawnAt: new Date(nowIso),
         receiptHash: `sha256:${hash}`,
-        receiptJson: receipt,
-        choices: {
-          create: decisions.map((d) => ({ categoryId: d.categoryId, allowed: d.allowed }))
-        }
+        receiptJson: { ...base, receipt_hash: `sha256:${hash}` },
+        choices: { create: decisions.map(d => ({ categoryId: d.categoryId, allowed: d.allowed })) }
       }
     });
     await addAudit(study.id, "participant", req.session.user.id, "WITHDRAWN", { version });
   });
 
-  const latestConsent = await prisma.consent.findFirst({
-    where: { studyId: study.id, participantId: req.session.user.id },
-    orderBy: { version: "desc" },
-    include: { choices: true }
-  });
-  const myUploads = await prisma.upload.findMany({
-    where: { studyId: study.id, participantId: req.session.user.id, deletedAt: null },
-    include: { category: true },
-    orderBy: { createdAt: "desc" }
-  });
+  const [latestConsent, myUploads, enrolled] = await Promise.all([
+    prisma.consent.findFirst({
+      where: { studyId: study.id, participantId: req.session.user.id },
+      orderBy: { version: "desc" },
+      include: { choices: true }
+    }),
+    prisma.upload.findMany({
+      where: { studyId: study.id, participantId: req.session.user.id, deletedAt: null },
+      include: { category: true },
+      orderBy: { createdAt: "desc" }
+    }),
+    isEnrolled(study.id, req.session.user.id)
+  ]);
 
-  return res.render("study_view", {
+  res.render("study_view", {
     title: study.title,
     user: req.session.user,
     study,
     latestConsent,
     myUploads,
+    enrolled,
     notice: `Consent withdrawn (v${version}).`,
     error: null
   });
 });
 
-/* -------- JSON routes now emit PDF directly (no JSON responses) ---------- */
+/* ----------------------------- history + diff ----------------------------- */
+
+// List all saved versions for this participant
+router.get("/s/:slug/history", requireAuth("participant"), async (req, res, next) => {
+  try {
+    const study = await prisma.study.findUnique({ where: { slug: req.params.slug } });
+    if (!study) {
+      return res.status(404).render("404", { title: "Not found", user: req.session?.user || null });
+    }
+
+    const consents = await prisma.consent.findMany({
+      where: { studyId: study.id, participantId: req.session.user.id },
+      orderBy: { version: "desc" },
+      include: { choices: true }
+    });
+
+    res.render("history", {
+      title: `Consent history — ${study.title}`,
+      user: req.session.user,
+      study,
+      consents
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Compare two versions
+router.get("/s/:slug/history/diff", requireAuth("participant"), async (req, res, next) => {
+  try {
+    const v1 = Number(req.query.v1);
+    const v2 = Number(req.query.v2);
+
+    const study = await prisma.study.findUnique({
+      where: { slug: req.params.slug },
+      include: { categories: true }
+    });
+    if (!study || !Number.isInteger(v1) || !Number.isInteger(v2)) {
+      return res.status(400).render("500", {
+        title: "Error",
+        user: req.session?.user || null,
+        message: "Bad versions"
+      });
+    }
+
+    const [c1, c2] = await Promise.all([
+      prisma.consent.findFirst({
+        where: { studyId: study.id, participantId: req.session.user.id, version: v1 },
+        include: { choices: true }
+      }),
+      prisma.consent.findFirst({
+        where: { studyId: study.id, participantId: req.session.user.id, version: v2 },
+        include: { choices: true }
+      })
+    ]);
+    if (!c1 || !c2) {
+      return res.status(404).render("404", { title: "Not found", user: req.session?.user || null });
+    }
+
+    const byId1 = new Map(c1.choices.map(ch => [ch.categoryId, ch.allowed]));
+    const byId2 = new Map(c2.choices.map(ch => [ch.categoryId, ch.allowed]));
+    const rows = study.categories.map(cat => {
+      const a = byId1.has(cat.id) ? (byId1.get(cat.id) ? "Allowed" : "Denied") : "—";
+      const b = byId2.has(cat.id) ? (byId2.get(cat.id) ? "Allowed" : "Denied") : "—";
+      return { name: cat.name, a, b, changed: a !== b };
+    });
+
+    res.render("history_diff", {
+      title: `Diff v${v1} → v${v2}: ${study.title}`,
+      user: req.session.user,
+      study,
+      v1,
+      v2,
+      c1,
+      c2,
+      rows
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/* -------------------------------- receipts -------------------------------- */
 
 router.get("/s/:slug/receipt/latest", requireAuth("participant"), async (req, res) => {
   const study = await prisma.study.findUnique({
@@ -334,10 +434,6 @@ router.get("/s/:slug/receipt/latest", requireAuth("participant"), async (req, re
     include: { categories: true }
   });
   if (!study) return res.status(404).send("Study not found");
-  if (study.status === "invite") {
-    const ok = await isEnrolled(study.id, req.session.user.id);
-    if (!ok) return res.status(403).send("Enroll first.");
-  }
 
   const latest = await prisma.consent.findFirst({
     where: { studyId: study.id, participantId: req.session.user.id },
@@ -347,7 +443,8 @@ router.get("/s/:slug/receipt/latest", requireAuth("participant"), async (req, re
   if (!latest) return res.status(404).send("No receipt available. Save choices first.");
 
   await addAudit(study.id, "participant", req.session.user.id, "RECEIPT_DOWNLOADED", {
-    version: latest.version, format: "pdf"
+    version: latest.version,
+    format: "pdf"
   });
 
   const filename = `receipt-${study.slug}-v${latest.version}`;
@@ -355,11 +452,10 @@ router.get("/s/:slug/receipt/latest", requireAuth("participant"), async (req, re
     await renderReceiptPdf(res, study, latest, filename);
   } catch (e) {
     console.error("[receipt latest → pdf]", e);
-    return res.status(500).send("Failed to generate PDF");
+    res.status(500).send("Failed to generate PDF");
   }
 });
 
-// Versioned receipt now also returns PDF
 router.get("/s/:slug/receipt/:version", requireAuth("participant"), async (req, res) => {
   const version = Number(req.params.version);
   const study = await prisma.study.findUnique({
@@ -367,10 +463,6 @@ router.get("/s/:slug/receipt/:version", requireAuth("participant"), async (req, 
     include: { categories: true }
   });
   if (!study || !Number.isInteger(version)) return res.status(404).send("Not found");
-  if (study.status === "invite") {
-    const ok = await isEnrolled(study.id, req.session.user.id);
-    if (!ok) return res.status(403).send("Enroll first.");
-  }
 
   const consent = await prisma.consent.findFirst({
     where: { studyId: study.id, participantId: req.session.user.id, version },
@@ -379,7 +471,8 @@ router.get("/s/:slug/receipt/:version", requireAuth("participant"), async (req, 
   if (!consent) return res.status(404).send("Receipt not found");
 
   await addAudit(study.id, "participant", req.session.user.id, "RECEIPT_DOWNLOADED", {
-    version: consent.version, format: "pdf"
+    version: consent.version,
+    format: "pdf"
   });
 
   const filename = `receipt-${study.slug}-v${consent.version}`;
@@ -387,130 +480,36 @@ router.get("/s/:slug/receipt/:version", requireAuth("participant"), async (req, 
     await renderReceiptPdf(res, study, consent, filename);
   } catch (e) {
     console.error("[receipt :version → pdf]", e);
-    return res.status(500).send("Failed to generate PDF");
+    res.status(500).send("Failed to generate PDF");
   }
 });
 
-router.get("/s/:slug/history", requireAuth("participant"), async (req, res) => {
-  const study = await prisma.study.findUnique({ where: { slug: req.params.slug } });
-  if (!study) return res.status(404).send("Study not found");
-  if (study.status === "invite") {
-    const ok = await isEnrolled(study.id, req.session.user.id);
-    if (!ok) return res.status(403).send("Enroll first.");
-  }
+/* --------------------------------- uploads -------------------------------- */
 
-  const consents = await prisma.consent.findMany({
-    where: { studyId: study.id, participantId: req.session.user.id },
-    orderBy: { version: "desc" },
-    include: { choices: true }
-  });
-
-  res.render("history", {
-    title: `History: ${study.title}`,
-    user: req.session.user,
-    study,
-    consents
-  });
-});
-
-router.get("/s/:slug/receipt/:version/view", requireAuth("participant"), async (req, res) => {
-  // this is HTML view; allowed (not a JSON download)
-  const version = Number(req.params.version);
-  const study = await prisma.study.findUnique({ where: { slug: req.params.slug } });
-  if (!study || !Number.isInteger(version)) return res.status(404).send("Not found");
-  if (study.status === "invite") {
-    const ok = await isEnrolled(study.id, req.session.user.id);
-    if (!ok) return res.status(403).send("Enroll first.");
-  }
-
-  const consent = await prisma.consent.findFirst({
-    where: { studyId: study.id, participantId: req.session.user.id, version }
-  });
-  if (!consent) return res.status(404).send("Receipt not found");
-
-  await addAudit(study.id, "participant", req.session.user.id, "RECEIPT_VIEWED", { version });
-
-  res.render("receipt_view", {
-    title: `Receipt v${version}: ${study.title}`,
-    user: req.session.user,
-    study,
-    version,
-    pretty: JSON.stringify(consent.receiptJson, null, 2)
-  });
-});
-
-router.get("/s/:slug/history/diff", requireAuth("participant"), async (req, res) => {
-  const v1 = Number(req.query.v1);
-  const v2 = Number(req.query.v2);
-  const study = await prisma.study.findUnique({
-    where: { slug: req.params.slug },
-    include: { categories: true }
-  });
-  if (!study || !Number.isInteger(v1) || !Number.isInteger(v2)) return res.status(400).send("Bad versions");
-  if (study.status === "invite") {
-    const ok = await isEnrolled(study.id, req.session.user.id);
-    if (!ok) return res.status(403).send("Enroll first.");
-  }
-
-  const [c1, c2] = await Promise.all([
-    prisma.consent.findFirst({
-      where: { studyId: study.id, participantId: req.session.user.id, version: v1 },
-      include: { choices: true }
-    }),
-    prisma.consent.findFirst({
-      where: { studyId: study.id, participantId: req.session.user.id, version: v2 },
-      include: { choices: true }
-    })
-  ]);
-  if (!c1 || !c2) return res.status(404).send("Version not found");
-
-  const byId1 = new Map(c1.choices.map((ch) => [ch.categoryId, ch.allowed]));
-  const byId2 = new Map(c2.choices.map((ch) => [ch.categoryId, ch.allowed]));
-
-  const rows = study.categories.map((cat) => {
-    const a = byId1.has(cat.id) ? (byId1.get(cat.id) ? "Allowed" : "Denied") : "—";
-    const b = byId2.has(cat.id) ? (byId2.get(cat.id) ? "Allowed" : "Denied") : "—";
-    const changed = a !== b;
-    return { name: cat.name, a, b, changed };
-  });
-
-  res.render("history_diff", {
-    title: `Diff v${v1} → v${v2}: ${study.title}`,
-    user: req.session.user,
-    study,
-    v1,
-    v2,
-    c1,
-    c2,
-    rows
-  });
-});
-
+// (UI currently hidden on the page but API remains)
 router.post("/s/:slug/upload", requireAuth("participant"), uploadMw.single("file"), async (req, res) => {
   const study = await prisma.study.findUnique({
     where: { slug: req.params.slug },
     include: { categories: true }
   });
   if (!study) return res.status(404).send("Study not found");
-  if (study.status === "invite") {
-    const ok = await isEnrolled(study.id, req.session.user.id);
-    if (!ok) return res.status(403).send("Enroll first to upload.");
-  }
   if (!req.file) return res.status(400).send("No file uploaded.");
 
   const categoryId = req.body.categoryId;
-  const category = study.categories.find((c) => c.id === categoryId);
+  const category = study.categories.find(c => c.id === categoryId);
   if (!category) {
     await fsp.unlink(req.file.path).catch(() => {});
     return res.status(400).send("Invalid category.");
   }
 
+  // Must have consent unless category is required
   const latest = await prisma.consent.findFirst({
     where: { studyId: study.id, participantId: req.session.user.id },
     orderBy: { version: "desc" },
     include: { choices: true }
   });
-  const allowed = category.required || (latest && latest.choices.find((ch) => ch.categoryId === categoryId && ch.allowed));
+  const allowed =
+    category.required || (latest && latest.choices.find(ch => ch.categoryId === categoryId && ch.allowed));
   if (!allowed) {
     await fsp.unlink(req.file.path).catch(() => {});
     return res.status(403).send("Upload not permitted for this category without consent.");
@@ -544,10 +543,13 @@ router.post("/s/:slug/upload", requireAuth("participant"), uploadMw.single("file
     include: { category: true }
   });
   await addAudit(study.id, "participant", req.session.user.id, "FILE_UPLOADED", {
-    uploadId: row.id, category: row.category.name, size: row.sizeBytes, mime: row.mime
+    uploadId: row.id,
+    category: row.category.name,
+    size: row.sizeBytes,
+    mime: row.mime
   });
 
-  return res.redirect(`/s/${study.slug}`);
+  res.redirect(`/s/${study.slug}`);
 });
 
 router.get("/uploads/:id/download", requireLogin, async (req, res) => {
@@ -579,7 +581,7 @@ router.post("/uploads/:id/delete", requireAuth("participant"), async (req, res) 
   await prisma.upload.update({ where: { id: up.id }, data: { deletedAt: new Date() } });
   await addAudit(up.studyId, "participant", req.session.user.id, "FILE_DELETED", { uploadId: up.id });
 
-  return res.redirect(`/s/${up.study.slug}`);
+  res.redirect(`/s/${up.study.slug}`);
 });
 
 export default router;
